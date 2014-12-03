@@ -162,29 +162,26 @@ test_tabulate
 
 
 void
-test_compute_mean
+test_compute_means
 (void)
 {
 
-   tab_t *tab;
+   double mean;
 
-   size_t x1[] = {2595};
-   tab = tabulate(x1, 1, 1);
-   test_assert(compute_mean(tab) == 2595.0);
-   free(tab);
+   size_t x1[1] = {2595};
+   compute_means(x1, 1, 1, &mean);
+   test_assert(mean == 2595.0);
 
-   size_t x2[] = {0,0,0,1,1,2,5};
-   tab = tabulate(x2, 1, 7);
-   test_assert(fabs(compute_mean(tab)-1.28571428) < 1e-6);
-   free(tab);
+   size_t x2[7] = {0,0,0,1,1,2,5};
+   compute_means(x2, 1, 7, &mean);
+   test_assert(fabs(mean-1.28571428) < 1e-6);
 
-   size_t x3[] = {0,89,231,55,309};
-   tab = tabulate(x3, 1, 5);
-   test_assert(fabs(compute_mean(tab)-136.8) < 1e-6);
-   free(tab);
+   size_t x3[5] = {0,89,231,55,309};
+   compute_means(x3, 1, 5, &mean);
+   test_assert(fabs(mean-136.8) < 1e-6);
 
    // 0:112, 1:94, 2:28, 3:12, 4:3, 7:1
-   size_t x4[] = {0,0,0,3,0,0,1,1,1,1,1,2,0,2,0,0,1,0,0,0,1,1,0,1,
+   size_t x4[250] = {0,0,0,3,0,0,1,1,1,1,1,2,0,2,0,0,1,0,0,0,1,1,0,1,
       1,0,1,1,0,2,1,0,2,1,1,0,2,1,1,1,1,1,0,0,2,0,2,1,1,1,2,1,0,0,
       1,0,1,0,0,1,0,0,3,2,0,0,0,0,0,2,1,1,1,0,0,1,0,0,1,0,0,1,0,1,
       0,1,2,1,2,1,0,0,0,2,0,0,0,1,2,1,0,1,1,1,2,0,0,0,0,0,2,1,3,0,
@@ -193,9 +190,8 @@ test_compute_mean
       0,1,1,3,1,1,1,1,0,0,0,0,3,1,3,0,1,1,0,0,0,1,1,0,1,2,4,2,0,0,
       4,0,2,1,0,0,2,1,2,1,7,1,2,3,0,0,1,1,0,3,1,1,1,3,1,1,0,0,0,0,
       1,2,2,0,1,1,0,1,1,1,0,2,3,0,0,0};
-   tab = tabulate(x4, 1, 250);
-   test_assert(fabs(compute_mean(tab)-0.82) < 1e-6);
-   free(tab);
+   compute_means(x4, 1, 250, &mean);
+   test_assert(fabs(mean-0.82) < 1e-6);
 
    return;
 
@@ -208,10 +204,11 @@ test_dlda
 {
 
    // 0:14, 1:5, 2:4, 3:1, 5:1
-   size_t x[] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-                  1,1,1,1,1,2,2,2,2,3,5 };
+   size_t x[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                     1,1,1,1,1,2,2,2,2,3,5 };
+   double mean;
+   compute_means(x, 1, 25, &mean);
    tab_t *tab = tabulate(x, 1, 25);
-   double mean = compute_mean(tab);
    test_assert(fabs(dlda(1.0, mean, 25, tab)+0.12747262) < 1e-6);
    test_assert(fabs(dlda(1.1, mean, 25, tab)+0.24215981) < 1e-6);
    test_assert(fabs(dlda(1.2, mean, 25, tab)+0.31636395) < 1e-6);
@@ -233,10 +230,11 @@ test_d2lda2
 {
 
    // 0:14, 1:5, 2:4, 3:1, 5:1
-   size_t x[] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-                  1,1,1,1,1,2,2,2,2,3,5 };
+   size_t x[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                    1,1,1,1,1,2,2,2,2,3,5 };
    tab_t *tab = tabulate(x, 1, 25);
-   double mean = compute_mean(tab);
+   double mean;
+   compute_means(x, 1, 25, &mean);
    test_assert(fabs(d2lda2(1.0, mean, 25, tab)+1.41167874) < 1e-6);
    test_assert(fabs(d2lda2(1.1, mean, 25, tab)+0.91683021) < 1e-6);
    test_assert(fabs(d2lda2(1.2, mean, 25, tab)+0.58911102) < 1e-6);
@@ -258,26 +256,47 @@ test_mle_nm
 {
 
    // These test cases have been verified with R.
+   nm_par_t *par;
    
    // 0:14, 1:5, 2:4, 3:1, 5:1
    size_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                   1,1,1,1,1,2,2,2,2,3,5 };
-   test_assert(fabs(mle_nm(x1, 1, 25)-0.9237) < 1e-3);
+   par = mle_nm(x1, 1, 25);
+   test_assert_critical(par != NULL);
+   test_assert(fabs(par->alpha-0.9237) < 1e-3);
+   test_assert(fabs(par->p[0]-0.5237) < 1e-3);
+   test_assert(fabs(par->p[1]-0.4763) < 1e-3);
+   free(par);
 
    // 0:27, 1:12, 2:8, 3:1, 4:1, 5:1
    size_t x2[50] = {3,0,1,2,0,0,1,0,0,0,0,1,1,0,0,1,2,2,0,0,0,1,2,
       0, 0,0,0,0,4,0,0,0,1,5,1,0,1,2,1,2,2,2,0,0,0,1,0,1,0,0};
-   test_assert(fabs(mle_nm(x2, 1, 50)-1.3436) < 1e-3);
+   par = mle_nm(x2, 1, 50);
+   test_assert_critical(par != NULL);
+   test_assert(fabs(par->alpha-1.3436) < 1e-3);
+   test_assert(fabs(par->p[0]-0.6267) < 1e-3);
+   test_assert(fabs(par->p[1]-0.3732) < 1e-3);
+   free(par);
 
    // 0:12, 1:7, 2:13, 3:4, 4:6, 5:2, 6:1, 7:3, 8:1, 9:1
    size_t x3[50] = {4,5,2,1,2,4,2,2,0,4,2,1,3,6,0,0,7,3,0,8,4,2,0,
       0,2,3,2,3,7,9,2,4,0,4,2,0,0,2,5,1,1,2,1,0,0,0,1,2,1,7};
-   test_assert(fabs(mle_nm(x3, 1, 50)-1.7969) < 1e-3);
+   par = mle_nm(x3, 1, 50);
+   test_assert_critical(par != NULL);
+   test_assert(fabs(par->alpha-1.7969) < 1e-3);
+   test_assert(fabs(par->p[0]-0.4221) < 1e-3);
+   test_assert(fabs(par->p[1]-0.5779) < 1e-3);
+   free(par);
 
    // 0:39, 1:8, 2:2, 3:1
    size_t x4[50] = {1,0,0,0,0,0,3,1,0,1,0,0,0,0,0,0,0,1,0,0,0,2,0,
       2,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0};
-   test_assert(fabs(mle_nm(x4, 1, 50)-0.7073) < 1e-3);
+   par = mle_nm(x4, 1, 50);
+   test_assert_critical(par != NULL);
+   test_assert(fabs(par->alpha-0.7073) < 1e-3);
+   test_assert(fabs(par->p[0]-0.7021) < 1e-3);
+   test_assert(fabs(par->p[1]-0.2978) < 1e-3);
+   free(par);
 
    // 0:59, 1:83, 2:99, 3:67, 4:67, 5:49, 6:27, 7:22, 8:11, 9:6
    // 10:6, 11:3, 12:2, 13:3
@@ -299,9 +318,15 @@ test_mle_nm
        0,0,5,6,0,1,8,5,1,3,1,8,1,8,1,6,7,2,8,2,2,3,3,0,4,2,1,9,6,
        0,6,7,1,8,2,2,1,11,3,0,4,2,5,1,6,8,3,4,7,0,4,2,4,1,1,1,6,0,
        4,4,6,2,1,3,1,0,4,9,3,1,4,2,2,0,1};
-   test_assert(fabs(mle_nm(x5, 1, 500)-3.0057) < 1e-3);
+   par = mle_nm(x5, 1, 500);
+   test_assert_critical(par != NULL);
+   test_assert(fabs(par->alpha-3.0057) < 1e-3);
+   test_assert(fabs(par->p[0]-0.4854) < 1e-3);
+   test_assert(fabs(par->p[1]-0.5145) < 1e-3);
+   free(par);
 
    return;
+
 }
 
 
@@ -318,7 +343,7 @@ main(
       {"histo_push", test_histo_push},
       {"compress_histo", test_compress_histo},
       {"tabulate", test_tabulate},
-      {"compute_mean", test_compute_mean},
+      {"compute_means", test_compute_means},
       {"dlda", test_dlda},
       {"d2lda2", test_d2lda2},
       {"mle_nm", test_mle_nm},

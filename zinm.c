@@ -4,25 +4,6 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-double
-compute_mean
-(
-   tab_t *tab
-)
-{
-
-   double sum = 0;
-   double total = 0;
-
-   for (size_t i = 0 ; i < tab->size ; i++) {
-      sum += tab->val[i]*tab->num[i];
-      total += tab->num[i];
-   }
-
-   return sum / total;
-
-}
-
 
 double
 dlda
@@ -90,7 +71,7 @@ d2lda2
 }
 
 
-double
+nm_par_t *
 mle_nm
 (
    size_t *x,
@@ -100,9 +81,20 @@ mle_nm
 {
 
    tab_t *tab = tabulate(x, dim, nobs);
-   const double mean = compute_mean(tab);
+   double *means = malloc(dim * sizeof(double));
+   if (means == NULL) {
+      fprintf(stderr, "memory error: %s:%d\n", __FILE__, __LINE__);
+      return NULL;
+   }
 
+   // Compute the means in all dimensions.
+   compute_means(x, dim, nobs, means);
+
+   // Compute the mean of marginal sums.
    double a = 1.0;
+   double mean = 0.0;
+   for (size_t i = 0 ; i < dim ; i++) mean += means[i];
+
    // Find upper and lower bouds for a(lpha).
    double a_lo;
    double a_hi;
@@ -120,7 +112,10 @@ mle_nm
    }
 
    // Input is pathological.
-   if (a_lo > 128) return -1.0;
+   if (a_lo > 128) {
+      free(means);
+      return NULL;
+   }
 
    double new_a = (a_lo + a_hi) / 2;
    for (int i = 0 ; i < ZINM_NR_MAXITER ; i++) {
@@ -134,16 +129,33 @@ mle_nm
    }
 
    free(tab);
-   return a;
+
+   nm_par_t *par = new_nm_par(dim);
+   if (par == NULL) {
+      free(means);
+      fprintf(stderr, "memory error: %s:%d\n", __FILE__, __LINE__);
+      return NULL;
+   }
+   par->alpha = a;
+   par->p[0] = a / (a + mean);
+   for (size_t i = 1 ; i < dim+1 ; i++) {
+      par->p[i] = par->p[0] / a * means[i-1];
+   }
+
+   free(means);
+
+   return par;
 
 }
+
+// helper functions //
 
 tab_t *
 tabulate
 (
-   size_t *x,
-   size_t dim,
-   size_t nobs
+   size_t * x,
+   size_t   dim,
+   size_t   nobs
 )
 {
 
@@ -161,6 +173,51 @@ tabulate
    tab_t *tab = compress_histo(histo);
    free(histo);
    return tab;
+
+}
+
+
+void
+compute_means
+(
+   size_t * x,
+   size_t   dim,
+   size_t   nobs,
+   double * means
+)
+{
+
+   memset(means, 0, dim*sizeof(double));
+   for (size_t i = 0 ; i < nobs ; i++) {
+   for (size_t j = 0 ; j < dim ; j++) {
+      means[j] += x[i+dim*j];
+   }
+   }
+
+   for (size_t j = 0 ; j < dim ; j++) {
+      means[j] /= nobs;
+   }
+
+   return;
+
+}
+
+
+nm_par_t *
+new_nm_par
+(
+   size_t r
+)
+{
+
+   nm_par_t *new = calloc(1, sizeof(nm_par_t) + (r+1)*sizeof(double));
+   if (new == NULL) {
+      fprintf(stderr, "memory error: %s:%d\n", __FILE__, __LINE__);
+      return NULL;
+   }
+   new->r = r;
+
+   return new;
 
 }
 
