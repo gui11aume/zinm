@@ -199,23 +199,21 @@ test_compute_means
 
 
 void
-test_dlda
+test_eval_nb_f
 (void)
 {
 
    // 0:14, 1:5, 2:4, 3:1, 5:1
    size_t x[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                      1,1,1,1,1,2,2,2,2,3,5 };
-   double mean;
-   compute_means(x, 1, 25, &mean);
    tab_t *tab = tabulate(x, 1, 25);
-   test_assert(fabs(dlda(1.0, mean, 25, tab)+0.12747262) < 1e-6);
-   test_assert(fabs(dlda(1.1, mean, 25, tab)+0.24215981) < 1e-6);
-   test_assert(fabs(dlda(1.2, mean, 25, tab)+0.31636395) < 1e-6);
-   test_assert(fabs(dlda(1.3, mean, 25, tab)+0.36350700) < 1e-6);
-   test_assert(fabs(dlda(1.4, mean, 25, tab)+0.39225466) < 1e-6);
-   test_assert(fabs(dlda(1.5, mean, 25, tab)+0.40834322) < 1e-6);
-   test_assert(fabs(dlda(2.0, mean, 25, tab)+0.39975512) < 1e-6);
+   test_assert(fabs(eval_nb_f(1.0, tab)+0.12747262) < 1e-6);
+   test_assert(fabs(eval_nb_f(1.1, tab)+0.24215981) < 1e-6);
+   test_assert(fabs(eval_nb_f(1.2, tab)+0.31636395) < 1e-6);
+   test_assert(fabs(eval_nb_f(1.3, tab)+0.36350700) < 1e-6);
+   test_assert(fabs(eval_nb_f(1.4, tab)+0.39225466) < 1e-6);
+   test_assert(fabs(eval_nb_f(1.5, tab)+0.40834322) < 1e-6);
+   test_assert(fabs(eval_nb_f(2.0, tab)+0.39975512) < 1e-6);
 
    free(tab);
 
@@ -225,7 +223,7 @@ test_dlda
 
 
 void
-test_d2lda2
+test_eval_nb_dfda
 (void)
 {
 
@@ -235,13 +233,12 @@ test_d2lda2
    tab_t *tab = tabulate(x, 1, 25);
    double mean;
    compute_means(x, 1, 25, &mean);
-   test_assert(fabs(d2lda2(1.0, mean, 25, tab)+1.41167874) < 1e-6);
-   test_assert(fabs(d2lda2(1.1, mean, 25, tab)+0.91683021) < 1e-6);
-   test_assert(fabs(d2lda2(1.2, mean, 25, tab)+0.58911102) < 1e-6);
-   test_assert(fabs(d2lda2(1.3, mean, 25, tab)+0.36790287) < 1e-6);
-   test_assert(fabs(d2lda2(1.4, mean, 25, tab)+0.21643981) < 1e-6);
-   test_assert(fabs(d2lda2(1.5, mean, 25, tab)+0.11168877) < 1e-6);
-   test_assert(fabs(d2lda2(2.0, mean, 25, tab)-0.08773865) < 1e-6);
+   test_assert(fabs(eval_nb_dfda(1.0, tab)+1.41167874) < 1e-6);
+   test_assert(fabs(eval_nb_dfda(1.2, tab)+0.58911102) < 1e-6);
+   test_assert(fabs(eval_nb_dfda(1.3, tab)+0.36790287) < 1e-6);
+   test_assert(fabs(eval_nb_dfda(1.4, tab)+0.21643981) < 1e-6);
+   test_assert(fabs(eval_nb_dfda(1.5, tab)+0.11168877) < 1e-6);
+   test_assert(fabs(eval_nb_dfda(2.0, tab)-0.08773865) < 1e-6);
 
    free(tab);
 
@@ -251,12 +248,186 @@ test_d2lda2
 
 
 void
+test_eval_zinm_f
+(void)
+{
+
+   test_assert(fabs(eval_zinm_f(1.0, .5, 1, 2.0)) < 1e-6);
+   test_assert(fabs(eval_zinm_f(1.0, .5, 2, 4.0)) < 1e-6);
+   test_assert(fabs(eval_zinm_f(1.3, .7, 141, 8.3)-678.0838351) < 1e-6);
+
+   return;
+
+}
+
+
+void
+test_eval_zinm_g
+(void)
+{
+
+   tab_t *tab;
+   // 0:14, 1:5, 2:4, 3:1, 5:1
+   size_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                  1,1,1,1,1,2,2,2,2,3,5 };
+   tab = tabulate(x1, 1, 25);
+   test_assert_critical(tab != NULL);
+   test_assert(fabs(eval_zinm_g(1, .5, tab)+0.1325713) < 1e-6);
+   free(tab);
+
+   return;
+
+}
+
+
+void
+test_eval_zinm_dfda
+(void)
+{
+
+   test_assert(fabs(eval_zinm_dfda(1, .5, 1)-1.2274112) < 1e-6);
+   test_assert(fabs(eval_zinm_dfda(1, .5, 9)-11.0467015) < 1e-6);
+   test_assert(fabs(eval_zinm_dfda(2, .5, 9)-12.9096451) < 1e-6);
+   test_assert(fabs(eval_zinm_dfda(2, .3, 9)-25.1159846) < 1e-6);
+   test_assert(fabs(eval_zinm_dfda(2.4, .3, 9)-26.3620864) < 1e-6);
+
+   return;
+
+}
+
+
+void
+test_eval_zinm_dfdp
+(void)
+{
+
+   test_assert(eval_zinm_dfdp(1, .5, 0, 0) == 0.0);
+   test_assert(eval_zinm_dfdp(1, .5, 1, 0) == 0.0);
+   test_assert(fabs(eval_zinm_dfdp(2, .5, 1, 0)+3.5555555) < 1e-6);
+   test_assert(fabs(eval_zinm_dfdp(2, .3, 1, 0)+19.5896899) < 1e-6);
+   test_assert(fabs(eval_zinm_dfdp(2, .3, 9, 0)+176.3072092) < 1e-6);
+   test_assert(fabs(eval_zinm_dfdp(2, .3, 9, 1.7)+179.7765970) < 1e-6);
+
+   return;
+
+}
+
+
+void
+test_eval_zinm_dgda
+(void)
+{
+
+   tab_t *tab;
+   // 0:14, 1:5, 2:4, 3:1, 5:1
+   size_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                  1,1,1,1,1,2,2,2,2,3,5 };
+   tab = tabulate(x1, 1, 25);
+   test_assert_critical(tab != NULL);
+   test_assert(fabs(eval_zinm_dgda(1, .5, tab)+2.2547559) < 1e-6);
+   test_assert(fabs(eval_zinm_dgda(2, .5, tab)+1.2605630) < 1e-6);
+   test_assert(fabs(eval_zinm_dgda(2, .3, tab)+1.8764955) < 1e-6);
+   free(tab);
+
+   return;
+
+}
+
+
+void
+test_ll_zinm
+(void)
+{
+
+   tab_t *tab;
+   // 0:14, 1:5, 2:4, 3:1, 5:1
+   size_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                  1,1,1,1,1,2,2,2,2,3,5 };
+   tab = tabulate(x1, 1, 25);
+   test_assert_critical(tab != NULL);
+   test_assert(fabs(ll_zinm(1, .5, 1, tab)+22.5329303) < 1e-6);
+   test_assert(fabs(ll_zinm(1, .5, .7, tab)+22.7832550) < 1e-6);
+   test_assert(fabs(ll_zinm(2, .5, .7, tab)+23.7608409) < 1e-6);
+   test_assert(fabs(ll_zinm(2, .3, .7, tab)+31.6978553) < 1e-6);
+   free(tab);
+
+   return;
+
+}
+
+
+void
+test_nb_est_alpha
+(void)
+{
+
+   tab_t *tab;
+   // 0:14, 1:5, 2:4, 3:1, 5:1
+   size_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                  1,1,1,1,1,2,2,2,2,3,5 };
+   tab = tabulate(x1, 1, 25);
+   test_assert_critical(tab != NULL);
+   test_assert(fabs(nb_est_alpha(tab)-0.9237) < 1e-3);
+   free(tab);
+
+   // 0:27, 1:12, 2:8, 3:1, 4:1, 5:1
+   size_t x2[50] = {3,0,1,2,0,0,1,0,0,0,0,1,1,0,0,1,2,2,0,0,0,1,2,
+      0, 0,0,0,0,4,0,0,0,1,5,1,0,1,2,1,2,2,2,0,0,0,1,0,1,0,0};
+   tab = tabulate(x2, 1, 50);
+   test_assert_critical(tab != NULL);
+   test_assert(fabs(nb_est_alpha(tab)-1.3436) < 1e-3);
+   free(tab);
+
+   // 0:12, 1:7, 2:13, 3:4, 4:6, 5:2, 6:1, 7:3, 8:1, 9:1
+   size_t x3[50] = {4,5,2,1,2,4,2,2,0,4,2,1,3,6,0,0,7,3,0,8,4,2,0,
+      0,2,3,2,3,7,9,2,4,0,4,2,0,0,2,5,1,1,2,1,0,0,0,1,2,1,7};
+   tab = tabulate(x3, 1, 50);
+   test_assert_critical(tab != NULL);
+   test_assert(fabs(nb_est_alpha(tab)-1.7969) < 1e-3);
+   free(tab);
+
+   // 0:39, 1:8, 2:2, 3:1
+   size_t x4[50] = {1,0,0,0,0,0,3,1,0,1,0,0,0,0,0,0,0,1,0,0,0,2,0,
+      2,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0};
+   tab = tabulate(x4, 1, 50);
+   test_assert_critical(tab != NULL);
+   test_assert(fabs(nb_est_alpha(tab)-0.7073) < 1e-3);
+   free(tab);
+
+   // 0:59, 1:83, 2:99, 3:67, 4:67, 5:49, 6:27, 7:22, 8:11, 9:6
+   // 10:6, 11:3, 12:2, 13:3
+   size_t x5[500] = {1,0,0,1,1,2,1,0,5,7,1,3,3,1,6,0,2,5,7,0,5,2,1,
+       10,5,3,4,5,7,0,8,6,3,0,2,1,1,0,2,3,7,2,3,2,2,1,0,4,4,2,4,2,
+       0,6,3,2,5,2,1,4,3,4,2,2,5,3,2,0,2,8,1,3,1,7,5,1,4,1,1,0,2,
+       2,4,1,1,1,4,1,3,4,4,10,5,2,0,7,1,6,1,3,6,4,0,2,4,1,12,2,5,
+       6,5,4,1,11,0,1,3,2,4,2,0,2,3,4,0,2,9,9,7,4,2,1,3,3,3,4,2,9,
+       2,4,3,2,2,4,2,5,3,0,1,3,2,0,3,3,4,1,3,3,5,7,3,3,2,1,5,5,4,
+       6,1,1,1,2,9,5,1,2,4,0,2,1,0,3,2,4,3,1,4,2,1,4,1,6,0,6,5,3,
+       5,2,0,1,2,1,0,5,3,2,7,6,4,3,2,5,7,5,5,1,1,3,10,2,0,5,0,1,2,
+       0,5,1,2,3,6,4,0,3,1,2,2,4,3,0,3,2,5,4,10,1,2,4,4,2,13,4,3,
+       1,5,4,8,5,6,2,3,4,3,1,5,5,1,8,2,0,5,7,3,2,2,4,2,3,1,5,3,7,
+       13,1,4,7,5,5,0,3,0,4,2,3,1,2,4,2,8,1,2,5,6,1,1,0,7,2,2,3,5,
+       12,2,2,2,0,3,3,4,0,2,5,1,10,0,7,6,5,0,11,2,3,7,3,5,4,2,1,2,
+       4,0,2,2,2,0,6,2,3,4,2,3,7,3,5,2,5,0,4,4,6,3,1,2,7,3,0,2,5,
+       7,2,2,0,0,0,6,3,0,1,1,5,5,2,6,2,4,6,0,1,2,3,2,2,2,3,4,1,1,
+       4,0,2,0,1,3,4,1,2,2,3,1,4,4,3,4,4,1,5,2,13,4,10,5,6,1,0,5,
+       0,0,5,6,0,1,8,5,1,3,1,8,1,8,1,6,7,2,8,2,2,3,3,0,4,2,1,9,6,
+       0,6,7,1,8,2,2,1,11,3,0,4,2,5,1,6,8,3,4,7,0,4,2,4,1,1,1,6,0,
+       4,4,6,2,1,3,1,0,4,9,3,1,4,2,2,0,1};
+   tab = tabulate(x5, 1, 500);
+   test_assert_critical(tab != NULL);
+   test_assert(fabs(nb_est_alpha(tab)-3.0057) < 1e-3);
+   free(tab);
+}
+
+
+void
 test_mle_nm
 (void)
 {
 
    // These test cases have been verified with R.
-   nm_par_t *par;
+   zinm_par_t *par;
    
    // 0:14, 1:5, 2:4, 3:1, 5:1
    size_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -330,6 +501,45 @@ test_mle_nm
 }
 
 
+void
+test_mle_zinm
+(void)
+{
+
+   // These test cases have been verified with R.
+   zinm_par_t *par;
+   
+   // 0:14, 1:5, 2:4, 3:1, 5:1
+   size_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+                  1,1,1,1,1,2,2,2,2,3,5 };
+   par = mle_zinm(x1, 1, 25);
+   test_assert_critical(par != NULL);
+   fprintf(stderr, "%f\n", par->alpha);
+   fprintf(stderr, "%f\n", par->pi);
+   fprintf(stderr, "%f\n", par->p[0]);
+   //test_assert(fabs(par->alpha-0.9237) < 1e-3);
+   //test_assert(fabs(par->p[0]-0.5237) < 1e-3);
+   //test_assert(fabs(par->p[1]-0.4763) < 1e-3);
+   free(par);
+
+   // 0:27, 1:12, 2:8, 3:1, 4:1, 5:1
+   size_t x2[50] = {3,0,1,2,0,0,1,0,0,0,0,1,1,0,0,1,2,2,0,0,0,1,2,
+      0, 0,0,0,0,4,0,0,0,1,5,1,0,1,2,1,2,2,2,0,0,0,1,0,1,0,0};
+   par = mle_nm(x2, 1, 50);
+   test_assert_critical(par != NULL);
+   fprintf(stderr, "%f\n", par->alpha);
+   fprintf(stderr, "%f\n", par->pi);
+   fprintf(stderr, "%f\n", par->p[0]);
+   //test_assert(fabs(par->alpha-1.3436) < 1e-3);
+   //test_assert(fabs(par->p[0]-0.6267) < 1e-3);
+   //test_assert(fabs(par->p[1]-0.3732) < 1e-3);
+   free(par);
+
+   return;
+
+}
+
+
 int
 main(
    int argc,
@@ -344,9 +554,17 @@ main(
       {"compress_histo", test_compress_histo},
       {"tabulate", test_tabulate},
       {"compute_means", test_compute_means},
-      {"dlda", test_dlda},
-      {"d2lda2", test_d2lda2},
+      {"eval_nb_f", test_eval_nb_f},
+      {"eval_nb_dfda", test_eval_nb_dfda},
+      {"eval_zinm_f", test_eval_zinm_f},
+      {"eval_zinm_g", test_eval_zinm_g},
+      {"eval_zinm_dfda", test_eval_zinm_dfda},
+      {"eval_zinm_dfdp", test_eval_zinm_dfdp},
+      {"eval_zinm_dgda", test_eval_zinm_dgda},
+      {"ll_zinm", test_ll_zinm},
+      {"nb_est_alpha", test_nb_est_alpha},
       {"mle_nm", test_mle_nm},
+      {"mle_zinm", test_mle_zinm},
       {NULL, NULL}
    };
 

@@ -6,11 +6,9 @@
 
 
 double
-dlda
+eval_nb_f
 (
          double a,
-         double m,
-         size_t n,
    const tab_t *tab
 )
 {
@@ -21,17 +19,25 @@ dlda
    const unsigned int *val = tab->val;
    const unsigned int *num = tab->num;
 
+   size_t nobs = num[0];
+   double mean = num[0] * val[0];
+
    prev = digamma(a + val[0]);
-   retval = n*(log(a) - digamma(a) - log(a + m)) + num[0] * prev;
+   retval = num[0] * prev;
    // Iterate over the occurrences and compute the new value
    // of digamma either by the recurrence relation, or by
    // a new call to 'digamma()', whichever is faster.
    for (size_t i = 1 ; i < tab->size ; i++) {
+      nobs += num[i];
+      mean += num[i] * val[i];
       prev = (val[i] - val[i-1] == 1) ?
          prev + 1.0 / (a-1 + val[i]) :
          digamma(a + val[i]);
       retval += num[i] * prev;
    }
+
+   mean /= nobs;
+   retval += nobs*(log(a) - digamma(a) - log(a + mean));
 
    return retval;
 
@@ -39,11 +45,9 @@ dlda
 
 
 double
-d2lda2
+eval_nb_dfda
 (
    double a,
-   double m,
-   size_t n,
    const tab_t *tab
 )
 {
@@ -54,25 +58,185 @@ d2lda2
    const unsigned int *val = tab->val;
    const unsigned int *num = tab->num;
 
+   size_t nobs = num[0];
+   double mean = num[0] * val[0];
+
    prev = trigamma(a + val[0]);
-   retval = n*(m/(a*(a+m)) - trigamma(a)) + num[0] * prev;
+   retval = num[0] * prev;
    // Iterate over the occurrences and compute the new value
    // of trigamma either by the recurrence relation, or by
    // a new call to 'trigamma()', whichever is faster.
    for (size_t i = 1 ; i < tab->size ; i++) {
+      nobs += num[i];
+      mean += num[i] * val[i];
       prev = (val[i] - val[i-1] == 1) ?
-         prev - 1.0 / ((a-1 +val[i])*(a-1 +val[i])) :
+         prev - 1.0 / sq(a-1 +val[i]) :
          trigamma(a + val[i]);
       retval += num[i] * prev;
    }
+
+   mean /= nobs;
+   retval += nobs*(mean/(a*(a+mean)) - trigamma(a));
 
    return retval;
 
 }
 
 
-nm_par_t *
-mle_nm
+double
+eval_zinm_f
+(
+   double a,
+   double p,
+   unsigned int nz,
+   double m
+)
+{
+   return a*nz / (p*(1-pow(p,a))) - m/(1-p);
+}
+
+
+double
+eval_zinm_g
+(
+         double a,
+         double p,
+   const tab_t *tab
+)
+{
+
+   // Convenience variables.
+   const unsigned int *val = tab->val;
+   const unsigned int *num = tab->num;
+
+   unsigned int nz = 0;
+   double retval = 0.0;
+   double prev = digamma(a + val[0]);
+
+   if (val[0] > 0) {
+      retval += num[0] * prev;
+      nz += num[0];
+   }
+
+   // Iterate over the occurrences and compute the new value
+   // of digamma either by the recurrence relation, or by
+   // a new call to 'digamma()', whichever is faster.
+   const size_t imin = val[0] == 0 ? 1 : 0;
+   for (size_t i = imin ; i < tab->size ; i++) {
+      nz += num[i];
+      prev = (val[i] - val[i-1] == 1) ?
+         prev + 1.0 / (a-1 + val[i]) :
+         digamma(a + val[i]);
+      retval += num[i] * prev;
+   }
+
+   retval += nz*(log(p) / (1-pow(p,a)) - digamma(a));
+   return retval;
+
+}
+
+
+double
+eval_zinm_dfda
+(
+   double a,
+   double p,
+   unsigned int nz
+)
+{
+   const double ppa = pow(p,a);
+   return nz*(1-ppa+a*ppa*log(p)) / (p*sq(1-ppa));
+}
+
+double
+eval_zinm_dfdp
+(
+   double a,
+   double p,
+   unsigned int nz,
+   double m
+)
+{
+   const double ppa = pow(p,a);
+   return -(nz*a*(1-(a+1)*ppa) / sq(p*(1-ppa)) + m/sq(1-p));
+}
+
+
+double
+eval_zinm_dgda
+(
+         double a,
+         double p,
+   const tab_t *tab
+)
+{
+   
+   // Convenience variables.
+   const unsigned int *val = tab->val;
+   const unsigned int *num = tab->num;
+   const double ppa = pow(p,a);
+
+   unsigned int nz = 0;
+   double retval = 0.0;
+   double prev = trigamma(a + val[0]);
+
+   if (val[0] > 0) {
+      retval += num[0] * prev;
+      nz += num[0];
+   }
+
+   // Iterate over the occurrences and compute the new value
+   // of digamma either by the recurrence relation, or by
+   // a new call to 'trigamma()', whichever is faster.
+   const size_t imin = val[0] == 0 ? 1 : 0;
+   for (size_t i = imin ; i < tab->size ; i++) {
+      nz += num[i];
+      prev = (val[i] - val[i-1] == 1) ?
+         prev - 1.0 / sq(a-1 + val[i]) :
+         trigamma(a + val[i]);
+      retval += num[i] * prev;
+   }
+
+   retval += nz*(sq(log(p))*ppa / sq(1-ppa) - trigamma(a));
+   return retval;
+
+}
+
+
+double
+ll_zinm
+(
+         double a,
+         double p,
+         double pi,
+   const tab_t *tab
+)
+{
+
+   // Convenience variables.
+   const unsigned int *val = tab->val;
+   const unsigned int *num = tab->num;
+   const unsigned int z0 = val[0] == 0 ? num[0] : 0;
+   const double logp_ = log(1-p);
+
+   unsigned int nobs = z0;
+   double retval = z0*log(pi*pow(p,a) + 1-pi);
+
+   const size_t imin = val[0] == 0 ? 1 : 0;
+   for (size_t i = imin ; i < tab->size ; i++) {
+      retval += num[i] * (lgamma(a+val[i]) + val[i]*logp_);
+      nobs += num[i];
+   }
+   // Ignore constant factorial terms.
+   retval += (nobs-z0) * (a*log(p) - lgamma(a) + log(pi));
+
+   return retval;
+
+}
+
+
+zinm_par_t *
+mle_zinm
 (
    size_t *x,
    size_t dim,
@@ -87,59 +251,180 @@ mle_nm
       return NULL;
    }
 
-   // Compute the means in all dimensions.
+   // Compute the means in all dimensions and the grand mean.
    compute_means(x, dim, nobs, means);
-
-   // Compute the mean of marginal sums.
-   double a = 1.0;
    double mean = 0.0;
    for (size_t i = 0 ; i < dim ; i++) mean += means[i];
 
+   // Extract the number of all-zero observaions.
+   const unsigned int z0 = tab->val[0] == 0 ? tab->num[0] : 0;
+
+   double deficit[11] = {0,.1,.2,.3,.4,.5,.6,.7,.8,.9,1};
+   double init_a[12] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1};
+   double init_p[12] = {0,0,0,0,0,0,0,0,0,0,0,.5};
+
+   // Deplete some 0s from the observations, compute alpha
+   // and p0 with standard negative binomial estimation
+   // and keep the values to be used as initial conditions.
+   for (size_t i = 0 ; i < 11 ; i++) {
+      double newmean = mean;
+      if (tab->val[0] == 0) {
+         tab->num[0] = z0 * (1-deficit[i]);
+         newmean /= (1.0 - z0*deficit[i]/nobs);
+      }
+      double alpha = nb_est_alpha(tab);
+      init_a[i] = alpha;
+      init_p[i] = alpha / (alpha + newmean);
+   }
+
+   // Rest 'tab'.
+   if (tab->val[0] == 0) tab->num[0] = z0;
+
+   // Try initial conditions. Number 12 is a safety in case
+   // all the rest failed during the first phase.
+   double max_loglik = -1.0/0.0; // -inf
+   zinm_par_t *par = new_zinm_par(dim);
+   if (par == NULL) {
+      fprintf(stderr, "memory error: %s:%d\n", __FILE__, __LINE__);
+      return NULL;
+   }
+   for (size_t i = 0 ; i < 12 ; i++) {
+
+      if (init_a[i] < 0) continue;  // Skip failures.
+
+      double a = init_a[i];
+      double p = init_p[i];
+
+      double grad;
+      unsigned int iter = 0;
+
+      double f = eval_zinm_f(a, p, nobs-z0, mean);
+      double g = eval_zinm_g(a, p, tab);
+
+      // Newton-Raphson iterations.
+      while ((grad = f*f+g*g) > ZINM_TOL && iter++ < ZINM_MAXITER) {
+
+         double dfda, dfdp, dgda, dgdp;
+         dfda = dgdp = eval_zinm_dfda(a, p, nobs-z0);
+         dfdp = eval_zinm_dfdp(a, p, nobs-z0, mean);
+         dgda = eval_zinm_dgda(a, p, tab);
+
+         double denom = dfdp*dgda - dfda*dgdp;
+         double da = (f*dgdp - g*dfdp) / denom;
+         double dp = (g*dfda - f*dgda) / denom;
+         f = eval_zinm_f(a, p, nobs-z0, mean);
+         g = eval_zinm_g(a, p, tab);
+
+         for (int j = 0 ; j < ZINM_MAXITER && f*f+g*g > grad ; j++) {
+            da /= 2;
+            dp /= 2;
+            f = eval_zinm_f(a, p, nobs-z0, mean);
+            g = eval_zinm_g(a, p, tab);
+         }
+
+         a = a+da;
+         p = p+dp;
+
+      }
+
+      double pi = (nobs-z0) / nobs / (1-pow(p,a));
+      double loglik = ll_zinm(a, p, pi, tab);
+      if (loglik > max_loglik) {
+         max_loglik = loglik;
+         par->alpha = a;
+         par->pi = pi;
+         par->p[0] = p;
+      }
+            
+   }
+
+   free(means);
+   return par;
+
+}
+
+double
+nb_est_alpha
+(
+   tab_t *tab
+)
+{
+
    // Find upper and lower bouds for a(lpha).
+   double a = 1.0;
    double a_lo;
    double a_hi;
-   if (dlda(a, mean, nobs, tab) < 0) {
+   if (eval_nb_f(a, tab) < 0) {
       a /= 2;
-      while (dlda(a, mean, nobs, tab) < 0) a /= 2;
+      while (eval_nb_f(a, tab) < 0) a /= 2;
       a_lo = a;
       a_hi = a*2;
    }
    else {
       a *= 2;
-      while (dlda(a, mean, nobs, tab) > 0) a *= 2;
+      while (eval_nb_f(a, tab) > 0) a *= 2;
       a_lo = a/2;
       a_hi = a;
    }
 
    // Input is pathological.
-   if (a_lo > 128) {
-      free(means);
-      return NULL;
-   }
+   if (a_lo > 128) return -1.0;
 
    double new_a = (a_lo + a_hi) / 2;
-   for (int i = 0 ; i < ZINM_NR_MAXITER ; i++) {
+   for (int i = 0 ; i < ZINM_MAXITER ; i++) {
       a = (new_a < a_lo || new_a > a_hi) ?
          (a_lo + a_hi) / 2 :
          new_a;
-      double eval = dlda(a, mean, nobs, tab);
-      if (eval < 0) a_hi = a; else a_lo = a;
-      if ((a_hi - a_lo) < ZINM_NR_TOLERANCE) break;
-      new_a = a - eval / d2lda2(a, mean, nobs, tab);
+      double f = eval_nb_f(a, tab);
+      if (f < 0) a_hi = a; else a_lo = a;
+      if ((a_hi - a_lo) < ZINM_TOL) break;
+      double dfda = eval_nb_dfda(a, tab);
+      new_a = a - f / dfda;
    }
 
+   return a;
+
+}
+
+zinm_par_t *
+mle_nm
+(
+   size_t *x,
+   size_t dim,
+   size_t nobs
+)
+{
+
+   // Estimate alpha.
+   tab_t *tab = tabulate(x, dim, nobs);
+   double alpha = nb_est_alpha(tab);
    free(tab);
 
-   nm_par_t *par = new_nm_par(dim);
+   // Return NULL if failed.
+   if (alpha < 0) return NULL;
+
+   // Compute the means in all dimensions.
+   double *means = malloc(dim * sizeof(double));
+   if (means == NULL) {
+      fprintf(stderr, "memory error: %s:%d\n", __FILE__, __LINE__);
+      return NULL;
+   }
+
+   compute_means(x, dim, nobs, means);
+
+   zinm_par_t *par = new_zinm_par(dim);
    if (par == NULL) {
       free(means);
       fprintf(stderr, "memory error: %s:%d\n", __FILE__, __LINE__);
       return NULL;
    }
-   par->alpha = a;
-   par->p[0] = a / (a + mean);
+
+   double mean = 0;
+   for (size_t i = 0 ; i < dim ; i++) mean += means[i];
+   par->alpha = alpha;
+   par->p[0] = alpha / (alpha + mean);
    for (size_t i = 1 ; i < dim+1 ; i++) {
-      par->p[i] = par->p[0] / a * means[i-1];
+      par->p[i] = par->p[0] / alpha * means[i-1];
    }
 
    free(means);
@@ -203,19 +488,20 @@ compute_means
 }
 
 
-nm_par_t *
-new_nm_par
+zinm_par_t *
+new_zinm_par
 (
    size_t r
 )
 {
 
-   nm_par_t *new = calloc(1, sizeof(nm_par_t) + (r+1)*sizeof(double));
+   zinm_par_t *new = calloc(1, sizeof(zinm_par_t) + (r+1)*sizeof(double));
    if (new == NULL) {
       fprintf(stderr, "memory error: %s:%d\n", __FILE__, __LINE__);
       return NULL;
    }
    new->r = r;
+   new->pi = 1.0;
 
    return new;
 
