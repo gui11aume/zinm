@@ -1,5 +1,5 @@
-#include "zinm.h"
 #include "unittest.h"
+#include "zinm.c"
 
 void
 test_new_histo
@@ -35,7 +35,7 @@ test_histo_push
    histo = new_histo();
    test_assert_critical(histo != NULL);
    for (size_t i = 0 ; i < (1 << 16) ; i++) {
-      test_assert(histo_push(&histo, i) == 0);
+      test_assert(histo_push(&histo, i));
    }
    test_assert(histo->size == (1 << 16));
    for (size_t i = 0 ; i < (1 << 16) ; i++) {
@@ -46,7 +46,7 @@ test_histo_push
    histo = new_histo();
    test_assert_critical(histo != NULL);
    for (size_t i = (1 << 16) ; i > 0 ; i--) {
-      test_assert(histo_push(&histo, i-1) == 0);
+      test_assert(histo_push(&histo, i-1));
    }
    test_assert(histo->size == 2*((1 << 16)-1));
    for (size_t i = 0 ; i < (1 << 16) ; i++) {
@@ -58,7 +58,7 @@ test_histo_push
    test_assert_critical(histo != NULL);
    redirect_stderr();
    set_alloc_failure_rate_to(1.0);
-   test_assert(histo_push(&histo, HISTO_INIT_SIZE) == 1);
+   test_assert(!histo_push(&histo, HISTO_INIT_SIZE));
    reset_alloc();
    unredirect_stderr();
    test_assert(strcmp(caught_in_stderr(), "") != 0);
@@ -76,7 +76,7 @@ test_compress_histo
    histo_t *histo = new_histo();
    test_assert_critical(histo != NULL);
    for (size_t i = 0 ; i < 4096 ; i += 2) {
-      test_assert(histo_push(&histo, i) == 0);
+      test_assert(histo_push(&histo, i));
    }
 
    tab_t *tab;
@@ -192,6 +192,19 @@ test_compute_means
       1,2,2,0,1,1,0,1,1,1,0,2,3,0,0,0};
    compute_means(x4, 1, 250, &mean);
    test_assert(fabs(mean-0.82) < 1e-6);
+
+   // Compute means in several dimensions.
+   double means2[2];
+
+   size_t x5[2] = {1,2595};
+   compute_means(x5, 2, 1, means2);
+   test_assert(means2[0] == 1.0);
+   test_assert(means2[1] == 2595.0);
+
+   size_t x6[4] = {1,2,11,12};
+   compute_means(x6, 2, 2, means2);
+   test_assert(means2[0] == 6.0);
+   test_assert(means2[1] == 7.0);
 
    return;
 
@@ -427,47 +440,43 @@ test_mle_nm
 {
 
    // These test cases have been verified with R.
-   zinm_par_t *par;
+   zinm_par_t *par = new_zinm_par(1);
+   if (par == NULL) {
+      fprintf(stderr, "test error line %d\n", __LINE__);
+      return;
+   }
    
    // 0:14, 1:5, 2:4, 3:1, 5:1
    size_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                   1,1,1,1,1,2,2,2,2,3,5 };
-   par = mle_nm(x1, 1, 25);
-   test_assert_critical(par != NULL);
+   test_assert(mle_nm(x1, 1, 25, par));
    test_assert(fabs(par->alpha-0.9237) < 1e-3);
    test_assert(fabs(par->p[0]-0.5237) < 1e-3);
    test_assert(fabs(par->p[1]-0.4763) < 1e-3);
-   free(par);
 
    // 0:27, 1:12, 2:8, 3:1, 4:1, 5:1
    size_t x2[50] = {3,0,1,2,0,0,1,0,0,0,0,1,1,0,0,1,2,2,0,0,0,1,2,
       0, 0,0,0,0,4,0,0,0,1,5,1,0,1,2,1,2,2,2,0,0,0,1,0,1,0,0};
-   par = mle_nm(x2, 1, 50);
-   test_assert_critical(par != NULL);
+   test_assert(mle_nm(x2, 1, 50, par));
    test_assert(fabs(par->alpha-1.3436) < 1e-3);
    test_assert(fabs(par->p[0]-0.6267) < 1e-3);
    test_assert(fabs(par->p[1]-0.3732) < 1e-3);
-   free(par);
 
    // 0:12, 1:7, 2:13, 3:4, 4:6, 5:2, 6:1, 7:3, 8:1, 9:1
    size_t x3[50] = {4,5,2,1,2,4,2,2,0,4,2,1,3,6,0,0,7,3,0,8,4,2,0,
       0,2,3,2,3,7,9,2,4,0,4,2,0,0,2,5,1,1,2,1,0,0,0,1,2,1,7};
-   par = mle_nm(x3, 1, 50);
-   test_assert_critical(par != NULL);
+   test_assert(mle_nm(x3, 1, 50, par));
    test_assert(fabs(par->alpha-1.7969) < 1e-3);
    test_assert(fabs(par->p[0]-0.4221) < 1e-3);
    test_assert(fabs(par->p[1]-0.5779) < 1e-3);
-   free(par);
 
    // 0:39, 1:8, 2:2, 3:1
    size_t x4[50] = {1,0,0,0,0,0,3,1,0,1,0,0,0,0,0,0,0,1,0,0,0,2,0,
       2,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0};
-   par = mle_nm(x4, 1, 50);
-   test_assert_critical(par != NULL);
+   test_assert(mle_nm(x4, 1, 50, par));
    test_assert(fabs(par->alpha-0.7073) < 1e-3);
    test_assert(fabs(par->p[0]-0.7021) < 1e-3);
    test_assert(fabs(par->p[1]-0.2978) < 1e-3);
-   free(par);
 
    // 0:59, 1:83, 2:99, 3:67, 4:67, 5:49, 6:27, 7:22, 8:11, 9:6
    // 10:6, 11:3, 12:2, 13:3
@@ -489,13 +498,52 @@ test_mle_nm
        0,0,5,6,0,1,8,5,1,3,1,8,1,8,1,6,7,2,8,2,2,3,3,0,4,2,1,9,6,
        0,6,7,1,8,2,2,1,11,3,0,4,2,5,1,6,8,3,4,7,0,4,2,4,1,1,1,6,0,
        4,4,6,2,1,3,1,0,4,9,3,1,4,2,2,0,1};
-   par = mle_nm(x5, 1, 500);
-   test_assert_critical(par != NULL);
+   test_assert(mle_nm(x5, 1, 500, par));
    test_assert(fabs(par->alpha-3.0057) < 1e-3);
    test_assert(fabs(par->p[0]-0.4854) < 1e-3);
    test_assert(fabs(par->p[1]-0.5145) < 1e-3);
-   free(par);
 
+   free(par);
+   par = NULL;
+
+   // Run cases in two dimensions.
+   par = new_zinm_par(2);
+   if (par == NULL) {
+      fprintf(stderr, "test error line %d\n", __LINE__);
+      return;
+   }
+
+   // Data obtained with the R code shown below.
+   //     set.seed(123)
+   //     l = rgamma(200, shape=2.1)
+   //     x = rpois(200, lambda=l)
+   //     y = rpois(200, lambda=3.5*l)
+   //     as.vector(t(cbind(x,y)))
+   //
+   // The data is pasted below.
+   size_t x6[400] = {1,2,3,15,0,0,2,0,3,25,3,4,0,2,0,0,2,12,3,4,
+      5,9,0,10,2,2,5,10,2,10,1,5,0,4,1,7,1,0,1,3,0,0,1,1,0,2,1,4,
+      0,5,0,3,5,7,4,8,1,10,2,6,2,11,0,3,2,6,1,7,6,8,0,1,4,8,1,4,
+      1,4,3,6,2,1,1,8,0,3,0,1,0,1,4,2,3,6,2,6,5,25,1,0,1,7,1,10,
+      2,5,7,6,6,15,1,1,0,0,3,2,1,15,0,5,1,1,1,4,1,7,4,3,0,5,0,2,
+      3,10,2,14,1,6,0,2,3,7,0,4,3,8,0,2,3,13,1,5,2,25,0,0,6,8,5,
+      15,3,7,6,12,2,4,4,4,0,4,4,14,3,6,2,4,2,5,0,5,2,6,1,10,3,1,
+      0,2,2,6,4,17,4,7,2,7,3,14,2,12,1,8,2,0,2,7,1,2,3,12,4,8,6,
+      15,4,4,1,5,1,11,0,1,3,3,0,6,2,13,1,5,2,2,6,16,1,3,2,10,2,7,
+      2,2,6,9,0,2,3,12,2,9,4,8,2,7,0,4,7,27,0,3,2,19,2,3,1,4,1,0,
+      0,0,0,6,2,7,1,9,1,6,2,8,1,3,4,12,1,4,3,12,1,4,6,19,3,9,1,0,
+      1,2,10,24,4,15,1,8,0,0,1,4,1,8,1,19,2,10,2,7,0,3,0,3,3,6,1,
+      5,4,22,2,7,1,3,2,7,0,0,0,8,2,8,1,5,1,1,3,8,0,1,0,5,1,3,1,4,
+      3,6,3,9,2,2,1,4,2,10,0,4,0,3,5,3,0,0,0,1,0,2,2,0,8,17,5,14,
+      2,9,2,5,2,8,4,12,0,2,1,4,6,12,7,16,7,15,0,6};
+   test_assert(mle_nm(x6, 2, 400, par));
+   // Real value of alpha is 2.1, and p is (.18, .18, .64).
+   test_assert(fabs(par->alpha-2.656310) < 1e-3);
+   test_assert(fabs(par->p[0]-0.261607) < 1e-3);
+   test_assert(fabs(par->p[1]-0.251383) < 1e-3);
+   test_assert(fabs(par->p[2]-0.487009) < 1e-3);
+   
+   free(par);
    return;
 
 }
@@ -508,7 +556,11 @@ test_mle_zinm
 
    // Cases checked by simulated annealing.
    
-   zinm_par_t *par;
+   zinm_par_t *par = new_zinm_par(1);
+   if (par == NULL) {
+      fprintf(stderr, "test error line %d\n", __LINE__);
+      return;
+   }
    
    // 0:53, 1:8, 2:9, 3:8, 4:4, 5:7, 6:3, 7:3, 8:1, 9:3, 10:1
    size_t x1[100] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -516,12 +568,10 @@ test_mle_zinm
       0,3,7,4,5,3,5,1,5,7,3,6,1,2,9,1,10,6,2,2,2,3,2,1,1,5,0,2,3,
       9,4,2,9,3,5,7,3,5,2,1,0,6,1,4,2,3,4,5,8,1 };
 
-   par = mle_zinm(x1, 1, 100);
-   test_assert_critical(par != NULL);
+   test_assert_critical(mle_zinm(x1, 1, 100, par) != NULL);
    test_assert(fabs(par->alpha-3.6855) < 1e-3);
    test_assert(fabs(par->p[0]-0.5044) < 1e-3);
    test_assert(fabs(par->pi-0.5110) < 1e-3);
-   free(par);
 
    // 0:73, 1:7, 2:7, 3:3, 4:4, 5:2, 7:1, 8:2, 9:1
    size_t x2[100] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -529,11 +579,11 @@ test_mle_zinm
       1,0,0,8,1,1,3,0,0,8,2,4,1,2,0,3,2,0,0,4,0,0,3,1,0,2,0,0,5,
       7,0,0,2,4,0,2,1,0,0,0,0,0,0,0,1,2,9,0,4 };
 
-   par = mle_zinm(x2, 1, 100);
-   test_assert_critical(par != NULL);
+   test_assert_critical(mle_zinm(x2, 1, 100, par) != NULL);
    test_assert(fabs(par->alpha-1.8251) < 1e-3);
    test_assert(fabs(par->p[0]-0.4109) < 1e-3);
    test_assert(fabs(par->pi-0.3363) < 1e-3);
+
    free(par);
 
    return;

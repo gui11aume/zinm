@@ -4,6 +4,23 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+// Declaration of local functions.
+tab_t * compress_histo(histo_t *);
+void    compute_means(size_t *, size_t, size_t, double *);
+double  eval_nb_dfda(double, const tab_t *);
+double  eval_nb_f(double, const tab_t *);
+double  eval_zinm_dfda(double, double, unsigned int);
+double  eval_zinm_dfdp(double, double, unsigned int, double);
+double  eval_zinm_dgda(double, double, const tab_t *);
+double  eval_zinm_f(double, double, unsigned int, double);
+double  eval_zinm_g(double, double, const tab_t *);
+int     histo_push(histo_t **, size_t);
+
+// Declaration of mathematical functions.
+double digamma(double);
+double trigamma(double);
+
+
 
 double
 eval_nb_f
@@ -240,7 +257,8 @@ mle_zinm
 (
    size_t *x,
    size_t dim,
-   size_t nobs
+   size_t nobs,
+   zinm_par_t *par
 )
 {
 
@@ -284,11 +302,6 @@ mle_zinm
    // Try initial conditions. Number 12 is a safety in case
    // all the rest failed during the first phase.
    double max_loglik = -1.0/0.0; // -inf
-   zinm_par_t *par = new_zinm_par(dim);
-   if (par == NULL) {
-      fprintf(stderr, "memory error: %s:%d\n", __FILE__, __LINE__);
-      return NULL;
-   }
 
    for (size_t i = 0 ; i < 12 ; i++) {
 
@@ -342,6 +355,7 @@ mle_zinm
             
    }
 
+   free(tab);
    free(means);
    return par;
 
@@ -390,50 +404,100 @@ nb_est_alpha
 
 }
 
-zinm_par_t *
+int
 mle_nm
 (
    size_t *x,
    size_t dim,
-   size_t nobs
+   size_t nobs,
+   zinm_par_t *par
 )
+// SYNOPSIS:
+//   Estimate the parameters of a negative multinomial of negative
+//   binomial distribution with the Newton-Raphson method. The
+//   negative binomial is the special case that 'dim' is equal to 1.
+//
+// PARAMETERS:
+//   x: data (counts)
+//   dim: the number of dimensions of the data
+//   nobs: the size of the sample (number of observations)
+//   par: a parameter set used as return value
+//
+// DETAILS:
+//   The data must be passed as a succession of vectors of dimension
+//   'dim'. This is to facilitate reading from a file where counts
+//   are typically given in columns whereas the file is read by row.
+//   For instance if 'dim' is 3 and the first observation is the
+//   vector (1,2,4), the first elements of 'x' must be 1, 2, 4, ...
+//
+//   The caller is responsible for the memory allocation of the
+//   parameters. A typical call would thus look as shown below.
+//
+//       zinm_par_t *par = new_zinm_par(dim);
+//       if (par == NULL) { /* out of memory */ }
+//       if (!mle_nm(x, dim, nobs, par)) { /* something wrong /* }
+//
+//   Upon success, 'par->alpha' contains the alpha parameter and the
+//   other parameters are in 'par->p[0]', ... , 'par->p[dim+1]'.
+//
+//   See the test cases for simple examples of usage.
+//
+// RETURN:
+//   Upon success '(int) 1', and upon failure '(int) 0'.
+//
+// SIDE EFFECTS:
+//   None (but calls 'malloc()' to allocate temporary variables).
 {
 
-   // Estimate alpha.
-   tab_t *tab = tabulate(x, dim, nobs);
-   double alpha = nb_est_alpha(tab);
-   free(tab);
+   tab_t *tab = NULL;
+   double *means = NULL;
 
-   // Return NULL if failed.
-   if (alpha < 0) return NULL;
+   int status = 0;
+
+   // Estimate alpha.
+   tab = tabulate(x, dim, nobs);
+   if (tab == NULL) {
+      fprintf(stderr, "error in function '%s()': %s:%d\n",
+            __func__, __FILE__, __LINE__);
+      goto clean_and_return;
+   }
+
+   double alpha = nb_est_alpha(tab);
+
+   if (alpha < 0) {
+      fprintf(stderr, "domain error in function '%s(): %s:%d'\n",
+            __func__, __FILE__, __LINE__);
+      goto clean_and_return;
+   }
 
    // Compute the means in all dimensions.
-   double *means = malloc(dim * sizeof(double));
+   means = malloc(dim * sizeof(double));
    if (means == NULL) {
-      fprintf(stderr, "memory error: %s:%d\n", __FILE__, __LINE__);
-      return NULL;
+      fprintf(stderr, "memory error in function '%s()': %s:%d\n",
+            __func__, __FILE__, __LINE__);
+      goto clean_and_return;
    }
 
    compute_means(x, dim, nobs, means);
 
-   zinm_par_t *par = new_zinm_par(dim);
-   if (par == NULL) {
-      free(means);
-      fprintf(stderr, "memory error: %s:%d\n", __FILE__, __LINE__);
-      return NULL;
-   }
+   double sum = 0;
+   for (size_t i = 0 ; i < dim ; i++) sum += means[i];
 
-   double mean = 0;
-   for (size_t i = 0 ; i < dim ; i++) mean += means[i];
+   // Write the estimates to 'par'.
    par->alpha = alpha;
-   par->p[0] = alpha / (alpha + mean);
+   par->p[0] = alpha / (alpha + sum);
    for (size_t i = 1 ; i < dim+1 ; i++) {
       par->p[i] = par->p[0] / alpha * means[i-1];
    }
 
-   free(means);
+   // Success.
+   status = 1;
 
-   return par;
+clean_and_return:
+   if (means != NULL) free(means);
+   if (tab != NULL) free(tab);
+
+   return status;
 
 }
 
@@ -448,20 +512,37 @@ tabulate
 )
 {
 
-   histo_t *histo = new_histo();
-   if (histo == NULL) return NULL;
+   tab_t *return_tab = NULL;
+   histo_t *tmp_histo = NULL;
+
+   tmp_histo = new_histo();
+
+   if (tmp_histo == NULL) {
+      fprintf(stderr, "error in function '%s()': %s:%d\n",
+            __func__, __FILE__, __LINE__);
+      goto clean_and_return;
+   }
+
    for (size_t i = 0 ; i < nobs ; i++) {
       size_t sum = 0;
       for (size_t j = 0 ; j < dim ; j++) sum += x[i+j*nobs];
-      if (histo_push(&histo, sum)) {
-         free(histo);
-         return NULL;
+      if (!histo_push(&tmp_histo, sum)) {
+         fprintf(stderr, "error in function '%s()': %s:%d\n",
+               __func__, __FILE__, __LINE__);
+         goto clean_and_return;
       }
    }
 
-   tab_t *tab = compress_histo(histo);
-   free(histo);
-   return tab;
+   return_tab = compress_histo(tmp_histo);
+   if (return_tab == NULL) {
+      fprintf(stderr, "error in function '%s()': %s:%d\n",
+            __func__, __FILE__, __LINE__);
+      goto clean_and_return;
+   }
+
+clean_and_return:
+   if (tmp_histo != NULL) free(tmp_histo);
+   return return_tab;
 
 }
 
@@ -479,7 +560,7 @@ compute_means
    memset(means, 0, dim*sizeof(double));
    for (size_t i = 0 ; i < nobs ; i++) {
    for (size_t j = 0 ; j < dim ; j++) {
-      means[j] += x[i+dim*j];
+      means[j] += x[j+dim*i];
    }
    }
 
@@ -519,7 +600,8 @@ new_histo
    size_t initsize = sizeof(histo_t) + HISTO_INIT_SIZE * sizeof(int);
    histo_t *new = calloc(1, initsize);
    if (new == NULL) {
-      fprintf(stderr, "memory error: %s:%d\n", __FILE__, __LINE__);
+      fprintf(stderr, "memory error in function '%s()': %s:%d\n",
+            __func__, __FILE__, __LINE__);
       return NULL;
    }
    new->size = HISTO_INIT_SIZE;
@@ -543,8 +625,9 @@ histo_push
       size_t newsize = 2*val * (sizeof(int));
       histo_t *new = realloc(histo, sizeof(histo_t) + newsize);
       if (new == NULL) {
-         fprintf(stderr, "memory error: %s:%d\n", __FILE__, __LINE__);
-         return 1;
+         fprintf(stderr, "memory error in function '%s()': %s:%d\n",
+               __func__, __FILE__, __LINE__);
+         return 0;
       }
       *histo_addr = histo = new;
       size_t added_size = (2*val - histo->size) * sizeof(int);
@@ -553,7 +636,7 @@ histo_push
    }
 
    histo->num[val]++;
-   return 0;
+   return 1;
 
 }
 
@@ -570,7 +653,8 @@ compress_histo
    }
    tab_t *new = malloc(sizeof(tab_t) + 2*size * sizeof(int));
    if (new == NULL) {
-      fprintf(stderr, "memory error: %s:%d\n", __FILE__, __LINE__);
+      fprintf(stderr, "memory error in function '%s()': %s:%d\n",
+            __func__, __FILE__, __LINE__);
       return NULL;
    }
    new->size = size;

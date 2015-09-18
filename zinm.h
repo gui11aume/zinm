@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef _PUBLIC_ZINM_HEADER
-#define _PUBLIC_ZINM_HEADER
+#ifndef _ZINM_HEADER
+#define _ZINM_HEADER
 
 #define HISTO_INIT_SIZE 128
 #define ZINM_MAXITER 32
@@ -40,24 +40,13 @@ struct tab_t {
    unsigned int val[];
 };
 
-tab_t      * compress_histo(histo_t *);
-void         compute_means(size_t *, size_t, size_t, double *);
-double       digamma(double);
-double       eval_nb_dfda(double, const tab_t *);
-double       eval_nb_f(double, const tab_t *);
-double 	     eval_zinm_dfda(double, double, unsigned int);
-double 	     eval_zinm_dfdp(double, double, unsigned int, double);
-double 	     eval_zinm_dgda(double, double, const tab_t *);
-double 	     eval_zinm_f(double, double, unsigned int, double);
-double 	     eval_zinm_g(double, double, const tab_t *);
-int          histo_push(histo_t **, size_t);
-double	     ll_zinm(double, double, double, const tab_t *);
-zinm_par_t * mle_nm(size_t *, size_t, size_t);
-zinm_par_t * mle_zinm(size_t *, size_t, size_t);
+// Exported functions.
+double	    ll_zinm(double, double, double, const tab_t *);
+int          mle_nm(size_t *, size_t, size_t, zinm_par_t *par);
+zinm_par_t * mle_zinm(size_t *, size_t, size_t, zinm_par_t *par);
 double       nb_est_alpha(tab_t *);
 histo_t    * new_histo(void);
 zinm_par_t * new_zinm_par(size_t);
-double       trigamma(double);
 tab_t      * tabulate(size_t *, size_t, size_t);
 
 #endif

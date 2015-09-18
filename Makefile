@@ -1,17 +1,14 @@
-OBJECTS= zinm.o gen.o pso.o
+OBJECTS= zinm.o
 
 CFLAGS= -std=gnu99 -g -Wall -O3
-LDLIBS= -lpthread -lm
+LDLIBS= -lm
 CC= gcc
 
-all: do
-
-do: $(OBJECTS) main.c 
-	$(CC) $(CFLAGS) $(INCLUDES) main.c $(OBJECTS) $(LDLIBS) -o do
-
-clean:
-	rm -f $(OBJECTS) do
+all: $(OBJECTS)
 
 %.o: %.c %.h
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
+
+clean:
+	rm -f $(OBJECTS)
 
