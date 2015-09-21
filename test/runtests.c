@@ -1,114 +1,13 @@
 #include "unittest.h"
 #include "zinm.c"
 
-void
-test_new_histo
-(void)
-{
-
-   histo_t *histo;
-   histo = new_histo();
-   test_assert_critical(histo != NULL);
-   for (size_t i = 0 ; i < HISTO_INIT_SIZE ; i++) {
-      test_assert(histo->num[i] == 0);
-   }
-   free(histo);
-
-   redirect_stderr();
-   set_alloc_failure_rate_to(1.0);
-   histo = new_histo();
-   reset_alloc();
-   unredirect_stderr();
-   test_assert(histo == NULL);
-   test_assert(strcmp(caught_in_stderr(), "") != 0);
-
-   return;
-
-}
-
-void
-test_histo_push
-(void)
-{
-
-   histo_t *histo;
-   histo = new_histo();
-   test_assert_critical(histo != NULL);
-   for (size_t i = 0 ; i < (1 << 16) ; i++) {
-      test_assert(histo_push(&histo, i));
-   }
-   test_assert(histo->size == (1 << 16));
-   for (size_t i = 0 ; i < (1 << 16) ; i++) {
-      test_assert(histo->num[i] == 1);
-   }
-   free(histo);
-
-   histo = new_histo();
-   test_assert_critical(histo != NULL);
-   for (size_t i = (1 << 16) ; i > 0 ; i--) {
-      test_assert(histo_push(&histo, i-1));
-   }
-   test_assert(histo->size == 2*((1 << 16)-1));
-   for (size_t i = 0 ; i < (1 << 16) ; i++) {
-      test_assert(histo->num[i] == 1);
-   }
-   free(histo);
-
-   histo = new_histo();
-   test_assert_critical(histo != NULL);
-   redirect_stderr();
-   set_alloc_failure_rate_to(1.0);
-   test_assert(!histo_push(&histo, HISTO_INIT_SIZE));
-   reset_alloc();
-   unredirect_stderr();
-   test_assert(strcmp(caught_in_stderr(), "") != 0);
-   free(histo);
-
-   return;
-
-}
-
-void
-test_compress_histo
-(void)
-{
-
-   histo_t *histo = new_histo();
-   test_assert_critical(histo != NULL);
-   for (size_t i = 0 ; i < 4096 ; i += 2) {
-      test_assert(histo_push(&histo, i));
-   }
-
-   tab_t *tab;
-   tab = compress_histo(histo);
-   test_assert_critical(tab != NULL);
-   test_assert(tab->size == 2048);
-   for (size_t i = 0 ; i < tab->size ; i++) {
-      test_assert(tab->val[i] == 2*i);
-      test_assert(tab->num[i] == 1);
-   }
-
-   free(tab);
-
-   redirect_stderr();
-   set_alloc_failure_rate_to(1.0);
-   tab = compress_histo(histo);
-   reset_alloc();
-   unredirect_stderr();
-   test_assert(tab == NULL);
-   test_assert(strcmp(caught_in_stderr(), "") != 0);
-
-   free(histo);
-   return;
-
-}
 
 void
 test_tabulate
 (void)
 {
 
-   size_t x[] = {1,2,3,4,5,6,7,8,9,10,11,12};
+   uint32_t x[] = {1,2,3,4,5,6,7,8,9,10,11,12};
    tab_t *tab;
    tab = tabulate(x, 3, 4);
    test_assert_critical(tab != NULL);
@@ -133,7 +32,7 @@ test_tabulate
    }
    free(tab);
 
-   size_t y[] = {4096,2048,1024,512};
+   uint32_t y[] = {4096,2048,1024,512};
    tab = tabulate(y, 1, 4);
    test_assert_critical(tab != NULL);
    test_assert(tab->size == 4);
@@ -156,6 +55,14 @@ test_tabulate
    }
    free(tab);
 
+   uint32_t z[] = {1,2,23784983};
+   tab = tabulate(z, 1, 3);
+   test_assert_critical(tab != NULL);
+   test_assert(tab->size == 3);
+   test_assert(tab->val[0] == 1);
+   test_assert(tab->val[1] == 2);
+   test_assert(tab->val[2] == 23784983);
+
    return;
 
 }
@@ -168,20 +75,20 @@ test_compute_means
 
    double mean;
 
-   size_t x1[1] = {2595};
+   uint32_t x1[1] = {2595};
    compute_means(x1, 1, 1, &mean);
    test_assert(mean == 2595.0);
 
-   size_t x2[7] = {0,0,0,1,1,2,5};
+   uint32_t x2[7] = {0,0,0,1,1,2,5};
    compute_means(x2, 1, 7, &mean);
    test_assert(fabs(mean-1.28571428) < 1e-6);
 
-   size_t x3[5] = {0,89,231,55,309};
+   uint32_t x3[5] = {0,89,231,55,309};
    compute_means(x3, 1, 5, &mean);
    test_assert(fabs(mean-136.8) < 1e-6);
 
    // 0:112, 1:94, 2:28, 3:12, 4:3, 7:1
-   size_t x4[250] = {0,0,0,3,0,0,1,1,1,1,1,2,0,2,0,0,1,0,0,0,1,1,0,1,
+   uint32_t x4[250] = {0,0,0,3,0,0,1,1,1,1,1,2,0,2,0,0,1,0,0,0,1,1,0,1,
       1,0,1,1,0,2,1,0,2,1,1,0,2,1,1,1,1,1,0,0,2,0,2,1,1,1,2,1,0,0,
       1,0,1,0,0,1,0,0,3,2,0,0,0,0,0,2,1,1,1,0,0,1,0,0,1,0,0,1,0,1,
       0,1,2,1,2,1,0,0,0,2,0,0,0,1,2,1,0,1,1,1,2,0,0,0,0,0,2,1,3,0,
@@ -196,12 +103,12 @@ test_compute_means
    // Compute means in several dimensions.
    double means2[2];
 
-   size_t x5[2] = {1,2595};
+   uint32_t x5[2] = {1,2595};
    compute_means(x5, 2, 1, means2);
    test_assert(means2[0] == 1.0);
    test_assert(means2[1] == 2595.0);
 
-   size_t x6[4] = {1,2,11,12};
+   uint32_t x6[4] = {1,2,11,12};
    compute_means(x6, 2, 2, means2);
    test_assert(means2[0] == 6.0);
    test_assert(means2[1] == 7.0);
@@ -217,7 +124,7 @@ test_eval_nb_f
 {
 
    // 0:14, 1:5, 2:4, 3:1, 5:1
-   size_t x[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   uint32_t x[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                      1,1,1,1,1,2,2,2,2,3,5 };
    tab_t *tab = tabulate(x, 1, 25);
    test_assert(fabs(eval_nb_f(1.0, tab)+0.12747262) < 1e-6);
@@ -241,7 +148,7 @@ test_eval_nb_dfda
 {
 
    // 0:14, 1:5, 2:4, 3:1, 5:1
-   size_t x[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   uint32_t x[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                     1,1,1,1,1,2,2,2,2,3,5 };
    tab_t *tab = tabulate(x, 1, 25);
    double mean;
@@ -281,7 +188,7 @@ test_eval_zinm_g
 
    tab_t *tab;
    // 0:14, 1:5, 2:4, 3:1, 5:1
-   size_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   uint32_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                   1,1,1,1,1,2,2,2,2,3,5 };
    tab = tabulate(x1, 1, 25);
    test_assert_critical(tab != NULL);
@@ -333,7 +240,7 @@ test_eval_zinm_dgda
 
    tab_t *tab;
    // 0:14, 1:5, 2:4, 3:1, 5:1
-   size_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   uint32_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                   1,1,1,1,1,2,2,2,2,3,5 };
    tab = tabulate(x1, 1, 25);
    test_assert_critical(tab != NULL);
@@ -354,7 +261,7 @@ test_ll_zinm
 
    tab_t *tab;
    // 0:14, 1:5, 2:4, 3:1, 5:1
-   size_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   uint32_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                   1,1,1,1,1,2,2,2,2,3,5 };
    tab = tabulate(x1, 1, 25);
    test_assert_critical(tab != NULL);
@@ -376,7 +283,7 @@ test_nb_est_alpha
 
    tab_t *tab;
    // 0:14, 1:5, 2:4, 3:1, 5:1
-   size_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   uint32_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                   1,1,1,1,1,2,2,2,2,3,5 };
    tab = tabulate(x1, 1, 25);
    test_assert_critical(tab != NULL);
@@ -384,7 +291,7 @@ test_nb_est_alpha
    free(tab);
 
    // 0:27, 1:12, 2:8, 3:1, 4:1, 5:1
-   size_t x2[50] = {3,0,1,2,0,0,1,0,0,0,0,1,1,0,0,1,2,2,0,0,0,1,2,
+   uint32_t x2[50] = {3,0,1,2,0,0,1,0,0,0,0,1,1,0,0,1,2,2,0,0,0,1,2,
       0, 0,0,0,0,4,0,0,0,1,5,1,0,1,2,1,2,2,2,0,0,0,1,0,1,0,0};
    tab = tabulate(x2, 1, 50);
    test_assert_critical(tab != NULL);
@@ -392,7 +299,7 @@ test_nb_est_alpha
    free(tab);
 
    // 0:12, 1:7, 2:13, 3:4, 4:6, 5:2, 6:1, 7:3, 8:1, 9:1
-   size_t x3[50] = {4,5,2,1,2,4,2,2,0,4,2,1,3,6,0,0,7,3,0,8,4,2,0,
+   uint32_t x3[50] = {4,5,2,1,2,4,2,2,0,4,2,1,3,6,0,0,7,3,0,8,4,2,0,
       0,2,3,2,3,7,9,2,4,0,4,2,0,0,2,5,1,1,2,1,0,0,0,1,2,1,7};
    tab = tabulate(x3, 1, 50);
    test_assert_critical(tab != NULL);
@@ -400,7 +307,7 @@ test_nb_est_alpha
    free(tab);
 
    // 0:39, 1:8, 2:2, 3:1
-   size_t x4[50] = {1,0,0,0,0,0,3,1,0,1,0,0,0,0,0,0,0,1,0,0,0,2,0,
+   uint32_t x4[50] = {1,0,0,0,0,0,3,1,0,1,0,0,0,0,0,0,0,1,0,0,0,2,0,
       2,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0};
    tab = tabulate(x4, 1, 50);
    test_assert_critical(tab != NULL);
@@ -409,7 +316,7 @@ test_nb_est_alpha
 
    // 0:59, 1:83, 2:99, 3:67, 4:67, 5:49, 6:27, 7:22, 8:11, 9:6
    // 10:6, 11:3, 12:2, 13:3
-   size_t x5[500] = {1,0,0,1,1,2,1,0,5,7,1,3,3,1,6,0,2,5,7,0,5,2,1,
+   uint32_t x5[500] = {1,0,0,1,1,2,1,0,5,7,1,3,3,1,6,0,2,5,7,0,5,2,1,
        10,5,3,4,5,7,0,8,6,3,0,2,1,1,0,2,3,7,2,3,2,2,1,0,4,4,2,4,2,
        0,6,3,2,5,2,1,4,3,4,2,2,5,3,2,0,2,8,1,3,1,7,5,1,4,1,1,0,2,
        2,4,1,1,1,4,1,3,4,4,10,5,2,0,7,1,6,1,3,6,4,0,2,4,1,12,2,5,
@@ -430,7 +337,9 @@ test_nb_est_alpha
    tab = tabulate(x5, 1, 500);
    test_assert_critical(tab != NULL);
    test_assert(fabs(nb_est_alpha(tab)-3.0057) < 1e-3);
+
    free(tab);
+
 }
 
 
@@ -447,7 +356,7 @@ test_mle_nm
    }
    
    // 0:14, 1:5, 2:4, 3:1, 5:1
-   size_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   uint32_t x1[25] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,
                   1,1,1,1,1,2,2,2,2,3,5 };
    test_assert(mle_nm(x1, 1, 25, par));
    test_assert(fabs(par->alpha-0.9237) < 1e-3);
@@ -455,7 +364,7 @@ test_mle_nm
    test_assert(fabs(par->p[1]-0.4763) < 1e-3);
 
    // 0:27, 1:12, 2:8, 3:1, 4:1, 5:1
-   size_t x2[50] = {3,0,1,2,0,0,1,0,0,0,0,1,1,0,0,1,2,2,0,0,0,1,2,
+   uint32_t x2[50] = {3,0,1,2,0,0,1,0,0,0,0,1,1,0,0,1,2,2,0,0,0,1,2,
       0, 0,0,0,0,4,0,0,0,1,5,1,0,1,2,1,2,2,2,0,0,0,1,0,1,0,0};
    test_assert(mle_nm(x2, 1, 50, par));
    test_assert(fabs(par->alpha-1.3436) < 1e-3);
@@ -463,7 +372,7 @@ test_mle_nm
    test_assert(fabs(par->p[1]-0.3732) < 1e-3);
 
    // 0:12, 1:7, 2:13, 3:4, 4:6, 5:2, 6:1, 7:3, 8:1, 9:1
-   size_t x3[50] = {4,5,2,1,2,4,2,2,0,4,2,1,3,6,0,0,7,3,0,8,4,2,0,
+   uint32_t x3[50] = {4,5,2,1,2,4,2,2,0,4,2,1,3,6,0,0,7,3,0,8,4,2,0,
       0,2,3,2,3,7,9,2,4,0,4,2,0,0,2,5,1,1,2,1,0,0,0,1,2,1,7};
    test_assert(mle_nm(x3, 1, 50, par));
    test_assert(fabs(par->alpha-1.7969) < 1e-3);
@@ -471,7 +380,7 @@ test_mle_nm
    test_assert(fabs(par->p[1]-0.5779) < 1e-3);
 
    // 0:39, 1:8, 2:2, 3:1
-   size_t x4[50] = {1,0,0,0,0,0,3,1,0,1,0,0,0,0,0,0,0,1,0,0,0,2,0,
+   uint32_t x4[50] = {1,0,0,0,0,0,3,1,0,1,0,0,0,0,0,0,0,1,0,0,0,2,0,
       2,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0};
    test_assert(mle_nm(x4, 1, 50, par));
    test_assert(fabs(par->alpha-0.7073) < 1e-3);
@@ -480,7 +389,7 @@ test_mle_nm
 
    // 0:59, 1:83, 2:99, 3:67, 4:67, 5:49, 6:27, 7:22, 8:11, 9:6
    // 10:6, 11:3, 12:2, 13:3
-   size_t x5[500] = {1,0,0,1,1,2,1,0,5,7,1,3,3,1,6,0,2,5,7,0,5,2,1,
+   uint32_t x5[500] = {1,0,0,1,1,2,1,0,5,7,1,3,3,1,6,0,2,5,7,0,5,2,1,
        10,5,3,4,5,7,0,8,6,3,0,2,1,1,0,2,3,7,2,3,2,2,1,0,4,4,2,4,2,
        0,6,3,2,5,2,1,4,3,4,2,2,5,3,2,0,2,8,1,3,1,7,5,1,4,1,1,0,2,
        2,4,1,1,1,4,1,3,4,4,10,5,2,0,7,1,6,1,3,6,4,0,2,4,1,12,2,5,
@@ -521,7 +430,7 @@ test_mle_nm
    //     as.vector(t(cbind(x,y)))
    //
    // The data is pasted below.
-   size_t x6[400] = {1,2,3,15,0,0,2,0,3,25,3,4,0,2,0,0,2,12,3,4,
+   uint32_t x6[400] = {1,2,3,15,0,0,2,0,3,25,3,4,0,2,0,0,2,12,3,4,
       5,9,0,10,2,2,5,10,2,10,1,5,0,4,1,7,1,0,1,3,0,0,1,1,0,2,1,4,
       0,5,0,3,5,7,4,8,1,10,2,6,2,11,0,3,2,6,1,7,6,8,0,1,4,8,1,4,
       1,4,3,6,2,1,1,8,0,3,0,1,0,1,4,2,3,6,2,6,5,25,1,0,1,7,1,10,
@@ -563,7 +472,7 @@ test_mle_zinm
    }
    
    // 0:53, 1:8, 2:9, 3:8, 4:4, 5:7, 6:3, 7:3, 8:1, 9:3, 10:1
-   size_t x1[100] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   uint32_t x1[100] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
       0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
       0,3,7,4,5,3,5,1,5,7,3,6,1,2,9,1,10,6,2,2,2,3,2,1,1,5,0,2,3,
       9,4,2,9,3,5,7,3,5,2,1,0,6,1,4,2,3,4,5,8,1 };
@@ -574,7 +483,7 @@ test_mle_zinm
    test_assert(fabs(par->pi-0.5110) < 1e-3);
 
    // 0:73, 1:7, 2:7, 3:3, 4:4, 5:2, 7:1, 8:2, 9:1
-   size_t x2[100] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+   uint32_t x2[100] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
       0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,5,
       1,0,0,8,1,1,3,0,0,8,2,4,1,2,0,3,2,0,0,4,0,0,3,1,0,2,0,0,5,
       7,0,0,2,4,0,2,1,0,0,0,0,0,0,0,1,2,9,0,4 };
@@ -600,9 +509,6 @@ main(
 
    // Register test cases //
    const static test_case_t test_cases[] = {
-      {"new_histo", test_new_histo},
-      {"histo_push", test_histo_push},
-      {"compress_histo", test_compress_histo},
       {"tabulate", test_tabulate},
       {"compute_means", test_compute_means},
       {"eval_nb_f", test_eval_nb_f},

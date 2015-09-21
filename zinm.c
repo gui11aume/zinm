@@ -1,20 +1,56 @@
+#include <float.h>
+#include <limits.h>
+#include <math.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "zinm.h"
 
+// Constants.
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
+#define HASH_SIZE 105943
+#define ZINM_MAXITER 32
+#define ZINM_TOL 1e-6
+
+#define sq(x) ((x)*(x))
+
+// Type definitions.
+struct tab_t;
+struct kv_t;
+
+typedef struct tab_t tab_t;
+typedef struct kv_t kv_t;
+
+struct tab_t {
+   size_t     size;
+   uint32_t * num;
+   uint32_t    val[];
+};
+
+struct kv_t {
+   uint32_t  key;
+   uint32_t val;
+};
+
+
 // Declaration of local functions.
-tab_t * compress_histo(histo_t *);
-void    compute_means(size_t *, size_t, size_t, double *);
+void    compute_means(uint32_t *, uint32_t, uint32_t, double *);
 double  eval_nb_dfda(double, const tab_t *);
 double  eval_nb_f(double, const tab_t *);
-double  eval_zinm_dfda(double, double, unsigned int);
-double  eval_zinm_dfdp(double, double, unsigned int, double);
+double  eval_zinm_dfda(double, double, uint32_t);
+double  eval_zinm_dfdp(double, double, uint32_t, double);
 double  eval_zinm_dgda(double, double, const tab_t *);
-double  eval_zinm_f(double, double, unsigned int, double);
+double  eval_zinm_f(double, double, uint32_t, double);
 double  eval_zinm_g(double, double, const tab_t *);
-int     histo_push(histo_t **, size_t);
+int     update(kv_t *, uint32_t);
+double  ll_zinm(double, double, double, const tab_t *);
+double  nb_est_alpha(tab_t *);
+kv_t  * new_counter(void);
+tab_t * tabulate(uint32_t *, uint32_t, uint32_t);
 
 // Declaration of mathematical functions.
 double digamma(double);
@@ -33,8 +69,8 @@ eval_nb_f
    double retval;
    double prev;
    // Convenience variables.
-   const unsigned int *val = tab->val;
-   const unsigned int *num = tab->num;
+   const uint32_t *val = tab->val;
+   const uint32_t *num = tab->num;
 
    size_t nobs = num[0];
    double mean = num[0] * val[0];
@@ -72,8 +108,8 @@ eval_nb_dfda
    double retval;
    double prev;
    // Convenience variables.
-   const unsigned int *val = tab->val;
-   const unsigned int *num = tab->num;
+   const uint32_t *val = tab->val;
+   const uint32_t *num = tab->num;
 
    size_t nobs = num[0];
    double mean = num[0] * val[0];
@@ -105,7 +141,7 @@ eval_zinm_f
 (
    double a,
    double p,
-   unsigned int nz,
+   uint32_t nz,
    double sum
 )
 {
@@ -123,10 +159,10 @@ eval_zinm_g
 {
 
    // Convenience variables.
-   const unsigned int *val = tab->val;
-   const unsigned int *num = tab->num;
+   const uint32_t *val = tab->val;
+   const uint32_t *num = tab->num;
 
-   unsigned int nz = 0;
+   uint32_t nz = 0;
    double retval = 0.0;
    double prev = digamma(a + val[0]);
 
@@ -158,7 +194,7 @@ eval_zinm_dfda
 (
    double a,
    double p,
-   unsigned int nz
+   uint32_t nz
 )
 {
    const double ppa = pow(p,a);
@@ -170,7 +206,7 @@ eval_zinm_dfdp
 (
    double a,
    double p,
-   unsigned int nz,
+   uint32_t nz,
    double m
 )
 {
@@ -189,11 +225,11 @@ eval_zinm_dgda
 {
    
    // Convenience variables.
-   const unsigned int *val = tab->val;
-   const unsigned int *num = tab->num;
+   const uint32_t *val = tab->val;
+   const uint32_t *num = tab->num;
    const double ppa = pow(p,a);
 
-   unsigned int nz = 0;
+   uint32_t nz = 0;
    double retval = 0.0;
    double prev = trigamma(a + val[0]);
 
@@ -231,12 +267,12 @@ ll_zinm
 {
 
    // Convenience variables.
-   const unsigned int *val = tab->val;
-   const unsigned int *num = tab->num;
-   const unsigned int z0 = val[0] == 0 ? num[0] : 0;
+   const uint32_t *val = tab->val;
+   const uint32_t *num = tab->num;
+   const uint32_t z0 = val[0] == 0 ? num[0] : 0;
    const double logp_ = log(1-p);
 
-   unsigned int nobs = z0;
+   uint32_t nobs = z0;
    double retval = z0*log(pi*pow(p,a) + 1-pi);
 
    const size_t imin = val[0] == 0 ? 1 : 0;
@@ -255,9 +291,9 @@ ll_zinm
 zinm_par_t *
 mle_zinm
 (
-   size_t *x,
-   size_t dim,
-   size_t nobs,
+   uint32_t *x,
+   uint32_t dim,
+   uint32_t nobs,
    zinm_par_t *par
 )
 {
@@ -407,9 +443,9 @@ nb_est_alpha
 int
 mle_nm
 (
-   size_t *x,
-   size_t dim,
-   size_t nobs,
+   uint32_t *x,
+   uint32_t dim,
+   uint32_t nobs,
    zinm_par_t *par
 )
 // SYNOPSIS:
@@ -506,18 +542,19 @@ clean_and_return:
 tab_t *
 tabulate
 (
-   size_t * x,
-   size_t   dim,
-   size_t   nobs
+   uint32_t * x,
+   uint32_t   dim,
+   uint32_t   nobs
 )
 {
 
-   tab_t *return_tab = NULL;
-   histo_t *tmp_histo = NULL;
+   tab_t *tab = NULL; // The return value.
+   kv_t *counter = NULL;
 
-   tmp_histo = new_histo();
+   // Count the "row sums" of 'x'.
+   counter = new_counter();
 
-   if (tmp_histo == NULL) {
+   if (counter == NULL) {
       fprintf(stderr, "error in function '%s()': %s:%d\n",
             __func__, __FILE__, __LINE__);
       goto clean_and_return;
@@ -526,23 +563,40 @@ tabulate
    for (size_t i = 0 ; i < nobs ; i++) {
       size_t sum = 0;
       for (size_t j = 0 ; j < dim ; j++) sum += x[i+j*nobs];
-      if (!histo_push(&tmp_histo, sum)) {
-         fprintf(stderr, "error in function '%s()': %s:%d\n",
+      if (!update(counter, sum)) {
+         fprintf(stderr, "counting error in function '%s()': %s:%d\n",
                __func__, __FILE__, __LINE__);
          goto clean_and_return;
       }
    }
 
-   return_tab = compress_histo(tmp_histo);
-   if (return_tab == NULL) {
-      fprintf(stderr, "error in function '%s()': %s:%d\n",
+   // Convert counts to 'tab_t'.
+   size_t sz = 0;
+   for (size_t i = 0 ; i < HASH_SIZE ; i++) sz += (counter[i].val > 0);
+
+   tab = malloc(sizeof(tab_t) + 2*sz * sizeof(int));
+   if (tab == NULL) {
+      fprintf(stderr, "memory error in function '%s()': %s:%d\n",
             __func__, __FILE__, __LINE__);
       goto clean_and_return;
    }
 
+   tab->size = sz;
+   tab->num = tab->val + sz;
+
+   size_t pos = 0;
+   for (size_t i = 0 ; i < HASH_SIZE ; i++) {
+      if (counter[i].val > 0) {
+         tab->val[pos] = counter[i].key;
+         tab->num[pos] = counter[i].val;
+         pos++;
+      }
+   }
+
+
 clean_and_return:
-   if (tmp_histo != NULL) free(tmp_histo);
-   return return_tab;
+   if (counter != NULL) free(counter);
+   return tab;
 
 }
 
@@ -550,10 +604,10 @@ clean_and_return:
 void
 compute_means
 (
-   size_t * x,
-   size_t   dim,
-   size_t   nobs,
-   double * means
+   uint32_t *x,
+   uint32_t dim,
+   uint32_t nobs,
+   double *means
 )
 {
 
@@ -592,19 +646,39 @@ new_zinm_par
 
 }
 
-histo_t *
-new_histo
+
+
+
+// Implementation of a counter of (small) 32 bit integers.
+// The implementation is a hash table without hashing. Small numbers
+// are stored at the beginning of the array, large numbers could
+// be anywhere. Collisions (which happen between a small and a large
+// number or between two large numbers) are resolved by quadratic
+// probing. The size of the table must be a prime for the probing
+// to scan every spot.
+//
+// A counter is just an array of entries (an 8 byte struct with
+// the integer and its count). The counter can hold 'HASH_SIZE'
+// entries. Once full, it cannot be incremented.
+//
+// This structure is a simple (dense) array for small integers and
+// a sparse array for large inteters. The main advantage is that
+// it will be fast and simple for small values, and that it will
+// not choke on large values.
+
+kv_t *
+new_counter
 (void)
+// Total size of the table: 830 kB.
 {
 
-   size_t initsize = sizeof(histo_t) + HISTO_INIT_SIZE * sizeof(int);
-   histo_t *new = calloc(1, initsize);
+   kv_t *new = calloc(HASH_SIZE, sizeof(kv_t));
+
    if (new == NULL) {
-      fprintf(stderr, "memory error in function '%s()': %s:%d\n",
+      fprintf(stderr, "memory error in function '%s()' %s:%d\n",
             __func__, __FILE__, __LINE__);
       return NULL;
    }
-   new->size = HISTO_INIT_SIZE;
 
    return new;
 
@@ -612,66 +686,40 @@ new_histo
 
 
 int
-histo_push
+update
 (
-   histo_t **histo_addr,
-   size_t val
+    kv_t *table,
+    uint32_t itg
 )
+// Return 1 if the operation succeeds, and 0 otherwise
+// (i.e. when the table is full).
 {
 
-   // Convenience variable.
-   histo_t *histo = *histo_addr;
-   if (val >= histo->size) {
-      size_t newsize = 2*val * (sizeof(int));
-      histo_t *new = realloc(histo, sizeof(histo_t) + newsize);
-      if (new == NULL) {
-         fprintf(stderr, "memory error in function '%s()': %s:%d\n",
-               __func__, __FILE__, __LINE__);
-         return 0;
+   for (size_t i = 0 ; i < HASH_SIZE ; i++) {
+
+      // Quadratic probing.
+      kv_t *e = table + ((itg + i*i) % HASH_SIZE);
+      if (e->key == itg || e->val == 0) {
+         // Found the integer or an empty spot.
+         e->key = itg;
+         e->val++;
+         return 1;
       }
-      *histo_addr = histo = new;
-      size_t added_size = (2*val - histo->size) * sizeof(int);
-      memset(histo->num + histo->size, 0, added_size);
-      histo->size = 2*val;
+
    }
 
-   histo->num[val]++;
-   return 1;
+   // The whole table has been scanned and there
+   // is nowhere to store this integer. Return the
+   // code for failure.
+   
+   return 0;
 
 }
 
-tab_t *
-compress_histo
-(
-   histo_t *histo
-)
-{
 
-   size_t size = 0;
-   for (size_t i = 0 ; i < histo->size ; i++) {
-      size += (histo->num[i] > 0);
-   }
-   tab_t *new = malloc(sizeof(tab_t) + 2*size * sizeof(int));
-   if (new == NULL) {
-      fprintf(stderr, "memory error in function '%s()': %s:%d\n",
-            __func__, __FILE__, __LINE__);
-      return NULL;
-   }
-   new->size = size;
-   new->num = new->val + size;
 
-   size_t j = 0;
-   for (size_t i = 0 ; i < histo->size ; i++) {
-      if (histo->num[i] > 0) {
-         new->val[j] = i;
-         new->num[j] = histo->num[i];
-         j++;
-      }
-   }
 
-   return new;
 
-}
 
 // The code below was copied from the following link
 // http://pmtksupport.googlecode.com/svn/trunk/lightspeed2.3/util.c

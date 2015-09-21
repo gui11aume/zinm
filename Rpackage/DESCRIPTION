@@ -1,0 +1,9 @@
+Package: zinm
+Title: Zero-Inflated Negative Multinomial
+Version: 0.1
+Date: 2015-09-19
+Author: Guillaume Filion
+Maintainer: Guillaume Filion <guillaume.filion@gmail.com>
+LazyData: true
+Description: Estimate parameters for Negative Binomial (NB), Negative Multinomial (NM), Zero-Inflated Negative Bionomial (ZINB) abd Zero-Inflated Negative Multinomial (ZINM) distributions.
+License: GPL (>=2)
