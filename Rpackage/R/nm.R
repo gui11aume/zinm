@@ -23,6 +23,6 @@ nm <- function(x) {
    
    # Allocate return value and call C function.
    par <- double(2+d)
-   return(.C("R_call_mle_nm", ix, d, n, par)[[4]])
+   return(.Call("R_call_mle_nm", ix, d, n))
 
 }

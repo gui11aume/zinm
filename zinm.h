@@ -12,8 +12,8 @@ struct zinm_par_t {
 };
 
 // Exported functions.
-int          mle_nm(uint32_t *, uint32_t, uint32_t, zinm_par_t *par);
+int          mle_nm(const uint32_t *, uint32_t, uint32_t, zinm_par_t *par);
 zinm_par_t * mle_zinm(uint32_t *, uint32_t, uint32_t, zinm_par_t *par);
-zinm_par_t * new_zinm_par(size_t);
+zinm_par_t * new_zinm_par(int);
 
 #endif

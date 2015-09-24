@@ -38,7 +38,7 @@ struct kv_t {
 
 
 // Declaration of local functions.
-void    compute_means(uint32_t *, uint32_t, uint32_t, double *);
+void    compute_means(const uint32_t *, uint32_t, uint32_t, double *);
 double  eval_nb_dfda(double, const tab_t *);
 double  eval_nb_f(double, const tab_t *);
 double  eval_zinm_dfda(double, double, uint32_t);
@@ -50,7 +50,7 @@ int     update(kv_t *, uint32_t);
 double  ll_zinm(double, double, double, const tab_t *);
 double  nb_est_alpha(tab_t *);
 kv_t  * new_counter(void);
-tab_t * tabulate(uint32_t *, uint32_t, uint32_t);
+tab_t * tabulate(const uint32_t *, uint32_t, uint32_t);
 
 // Declaration of mathematical functions.
 double digamma(double);
@@ -443,10 +443,10 @@ nb_est_alpha
 int
 mle_nm
 (
-   uint32_t *x,
-   uint32_t dim,
-   uint32_t nobs,
-   zinm_par_t *par
+   const uint32_t *x,
+         uint32_t dim,
+         uint32_t nobs,
+         zinm_par_t *par
 )
 // SYNOPSIS:
 //   Estimate the parameters of a negative multinomial of negative
@@ -542,9 +542,9 @@ clean_and_return:
 tab_t *
 tabulate
 (
-   uint32_t * x,
-   uint32_t   dim,
-   uint32_t   nobs
+   const uint32_t * x,
+         uint32_t   dim,
+         uint32_t   nobs
 )
 {
 
@@ -604,10 +604,10 @@ clean_and_return:
 void
 compute_means
 (
-   uint32_t *x,
-   uint32_t dim,
-   uint32_t nobs,
-   double *means
+   const uint32_t *x,
+         uint32_t dim,
+         uint32_t nobs,
+         double *means
 )
 {
 
@@ -630,7 +630,7 @@ compute_means
 zinm_par_t *
 new_zinm_par
 (
-   size_t r
+   int r
 )
 {
 
