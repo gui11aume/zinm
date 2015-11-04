@@ -1,8 +1,11 @@
 language: c
+
 compiler:
   - gcc
   - clang
+
 branches:
   only:
     - master
+
 script: cd test && make
