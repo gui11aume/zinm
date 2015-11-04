@@ -2,3 +2,7 @@
 *.so
 *~
 *.swp
+*.gcda
+*.gcno
+test/.inspect.gdb
+test/runtests

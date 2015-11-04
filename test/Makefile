@@ -3,6 +3,8 @@ vpath %.c lib
 vpath %.h ..
 vpath %.h lib
 
+all: test testRpackage
+
 P= runtests
 
 CC= gcc
@@ -23,8 +25,14 @@ clean:
 libunittest.so: unittest.c
 	$(CC) -fPIC -shared $(CFLAGS) -o libunittest.so lib/unittest.c
 
+../Rpackage/src/Rzinm.so:
+	cd ../Rpackage/src && $(MAKE)
+
 test: $(P)
 	./$(P)
+
+testRpackage: ../Rpackage/src/Rzinm.so
+	R -f testset.R
 
 inspect: $(P)
 	gdb --command=.inspect.gdb --args $(P)
