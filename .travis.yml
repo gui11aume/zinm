@@ -8,4 +8,4 @@ branches:
   only:
     - master
 
-script: cd test && make
+script: cd test && make test
