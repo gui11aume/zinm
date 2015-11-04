@@ -63,6 +63,7 @@ test_tabulate
    test_assert(tab->val[1] == 2);
    test_assert(tab->val[2] == 23784983);
 
+   free(tab);
    return;
 
 }
@@ -445,19 +446,14 @@ test_mle_nm
       5,4,22,2,7,1,3,2,7,0,0,0,8,2,8,1,5,1,1,3,8,0,1,0,5,1,3,1,4,
       3,6,3,9,2,2,1,4,2,10,0,4,0,3,5,3,0,0,0,1,0,2,2,0,8,17,5,14,
       2,9,2,5,2,8,4,12,0,2,1,4,6,12,7,16,7,15,0,6};
-   test_assert(mle_nm(x6, 2, 400, par));
-   // Real value of alpha is 2.1, and p is (.18, .18, .64).
-   
-   // XXX DEBUG XXX //
-   fprintf(stderr, "\n%f\n", par->alpha);
-   fprintf(stderr, "%f\n", par->p[0]);
-   fprintf(stderr, "%f\n", par->p[1]);
-   fprintf(stderr, "%f\n\n", par->p[2]);
 
-   test_assert(fabs(par->alpha-2.656310) < 1e-3);
-   test_assert(fabs(par->p[0]-0.261607) < 1e-3);
-   test_assert(fabs(par->p[1]-0.251383) < 1e-3);
-   test_assert(fabs(par->p[2]-0.487009) < 1e-3);
+   test_assert(mle_nm(x6, 2, 200, par));
+   // Real value of alpha is 2.1, and p is (.18, .18, .64).
+
+   test_assert(fabs(par->alpha-1.937450) < 1e-3);
+   test_assert(fabs(par->p[0]-0.181793) < 1e-3);
+   test_assert(fabs(par->p[1]-0.189070) < 1e-3);
+   test_assert(fabs(par->p[2]-0.629137) < 1e-3);
    
    free(par);
    return;
