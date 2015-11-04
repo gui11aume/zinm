@@ -10,19 +10,19 @@ nm <- function(x) {
       n <- length(ix)
    }
    else if (is.matrix(x)) {
-      ix <- apply(x, c(1,2), as.integer)
-      d <- ncol(ix)
-      n <- nrow(ix)
+      # The data must be transposed.
+      ix <- apply(t(x), c(1,2), as.integer)
+      d <- nrow(ix)
+      n <- ncol(ix)
    }
    else {
       stop("x must be a matrix or a vector")
    }
-   if (any((x-ix) != 0 )) {
+   if (any((t(x)-ix) != 0 )) {
       warning("non-integer x")
    }
    
    # Allocate return value and call C function.
-   par <- double(2+d)
    return(.Call("R_call_mle_nm", ix, d, n))
 
 }

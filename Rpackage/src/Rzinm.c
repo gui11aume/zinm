@@ -45,7 +45,7 @@ R_call_mle_nm
    SEXP RET;
    PROTECT(RET = allocVector(REALSXP, d+2));
    REAL(RET)[0] = par->alpha;
-   for (size_t i = 0 ; i < d+2 ; i++) {
+   for (size_t i = 0 ; i < d+1 ; i++) {
       REAL(RET)[i+1] = par->p[i];
    }
 
