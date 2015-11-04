@@ -447,6 +447,13 @@ test_mle_nm
       2,9,2,5,2,8,4,12,0,2,1,4,6,12,7,16,7,15,0,6};
    test_assert(mle_nm(x6, 2, 400, par));
    // Real value of alpha is 2.1, and p is (.18, .18, .64).
+   
+   // XXX DEBUG XXX //
+   fprintf(stderr, "\n%f\n", par->alpha);
+   fprintf(stderr, "%f\n", par->p[0]);
+   fprintf(stderr, "%f\n", par->p[1]);
+   fprintf(stderr, "%f\n\n", par->p[2]);
+
    test_assert(fabs(par->alpha-2.656310) < 1e-3);
    test_assert(fabs(par->p[0]-0.261607) < 1e-3);
    test_assert(fabs(par->p[1]-0.251383) < 1e-3);

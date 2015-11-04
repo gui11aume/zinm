@@ -3,7 +3,7 @@ vpath %.c lib
 vpath %.h ..
 vpath %.h lib
 
-all: test testRpackage
+all: testRpackage test
 
 P= runtests
 
