@@ -9,5 +9,5 @@ x = rpois(n=1000, lambda=100*lambda)
 y = rpois(n=1000, lambda=35*lambda)
 
 
-target = c(1.18090772, 0.01092251, 0.73333581, 0.25574168)
+target = c(1.18090772, 79.286000, 27.650000)
 stopifnot(max(abs(nm(cbind(x,y)) - target)) < 1e-6)

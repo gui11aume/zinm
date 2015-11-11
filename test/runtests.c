@@ -361,34 +361,30 @@ test_mle_nm
                   1,1,1,1,1,2,2,2,2,3,5 };
    test_assert(mle_nm(x1, 1, 25, par));
    test_assert(fabs(par->alpha-0.9237) < 1e-3);
-   test_assert(fabs(par->p[0]-0.5237) < 1e-3);
-   test_assert(fabs(par->p[1]-0.4763) < 1e-3);
+   test_assert(fabs(par->mu[0]-0.8400) < 1e-3);
 
    // 0:27, 1:12, 2:8, 3:1, 4:1, 5:1
    uint32_t x2[50] = {3,0,1,2,0,0,1,0,0,0,0,1,1,0,0,1,2,2,0,0,0,1,2,
       0, 0,0,0,0,4,0,0,0,1,5,1,0,1,2,1,2,2,2,0,0,0,1,0,1,0,0};
    test_assert(mle_nm(x2, 1, 50, par));
    test_assert(fabs(par->alpha-1.3436) < 1e-3);
-   test_assert(fabs(par->p[0]-0.6267) < 1e-3);
-   test_assert(fabs(par->p[1]-0.3732) < 1e-3);
+   test_assert(fabs(par->mu[0]-0.8000) < 1e-3);
 
    // 0:12, 1:7, 2:13, 3:4, 4:6, 5:2, 6:1, 7:3, 8:1, 9:1
    uint32_t x3[50] = {4,5,2,1,2,4,2,2,0,4,2,1,3,6,0,0,7,3,0,8,4,2,0,
       0,2,3,2,3,7,9,2,4,0,4,2,0,0,2,5,1,1,2,1,0,0,0,1,2,1,7};
    test_assert(mle_nm(x3, 1, 50, par));
    test_assert(fabs(par->alpha-1.7969) < 1e-3);
-   test_assert(fabs(par->p[0]-0.4221) < 1e-3);
-   test_assert(fabs(par->p[1]-0.5779) < 1e-3);
+   test_assert(fabs(par->mu[0]-2.4600) < 1e-3);
 
    // 0:39, 1:8, 2:2, 3:1
    uint32_t x4[50] = {1,0,0,0,0,0,3,1,0,1,0,0,0,0,0,0,0,1,0,0,0,2,0,
       2,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0};
    test_assert(mle_nm(x4, 1, 50, par));
    test_assert(fabs(par->alpha-0.7073) < 1e-3);
-   test_assert(fabs(par->p[0]-0.7021) < 1e-3);
-   test_assert(fabs(par->p[1]-0.2978) < 1e-3);
+   test_assert(fabs(par->mu[0]-0.3000) < 1e-3);
 
-   // 0:59, 1:83, 2:99, 3:67, 4:67, 5:49, 6:27, 7:22, 8:11, 9:6
+   // 0:59, 1:83, 2:99, 3:67, 4:63, 5:49, 6:27, 7:22, 8:11, 9:6
    // 10:6, 11:3, 12:2, 13:3
    uint32_t x5[500] = {1,0,0,1,1,2,1,0,5,7,1,3,3,1,6,0,2,5,7,0,5,2,1,
        10,5,3,4,5,7,0,8,6,3,0,2,1,1,0,2,3,7,2,3,2,2,1,0,4,4,2,4,2,
@@ -410,8 +406,7 @@ test_mle_nm
        4,4,6,2,1,3,1,0,4,9,3,1,4,2,2,0,1};
    test_assert(mle_nm(x5, 1, 500, par));
    test_assert(fabs(par->alpha-3.0057) < 1e-3);
-   test_assert(fabs(par->p[0]-0.4854) < 1e-3);
-   test_assert(fabs(par->p[1]-0.5145) < 1e-3);
+   test_assert(fabs(par->mu[0]-3.1860) < 1e-3);
 
    free(par);
    par = NULL;
@@ -450,17 +445,16 @@ test_mle_nm
    test_assert(mle_nm(x6, 2, 200, par));
    // Real value of alpha is 2.1, and p is (.18, .18, .64).
 
-   test_assert(fabs(par->alpha-1.937450) < 1e-3);
-   test_assert(fabs(par->p[0]-0.181793) < 1e-3);
-   test_assert(fabs(par->p[1]-0.189070) < 1e-3);
-   test_assert(fabs(par->p[2]-0.629137) < 1e-3);
+   test_assert(fabs(par->alpha-1.9374) < 1e-3);
+   test_assert(fabs(par->mu[0]-2.0150) < 1e-3);
+   test_assert(fabs(par->mu[1]-6.7050) < 1e-3);
    
    free(par);
    return;
 
 }
 
-
+#if 0
 void
 test_mle_zinm
 (void)
@@ -482,7 +476,7 @@ test_mle_zinm
 
    test_assert_critical(mle_zinm(x1, 1, 100, par) != NULL);
    test_assert(fabs(par->alpha-3.6855) < 1e-3);
-   test_assert(fabs(par->p[0]-0.5044) < 1e-3);
+   test_assert(fabs(par->mu[0]-0.5044) < 1e-3);
    test_assert(fabs(par->pi-0.5110) < 1e-3);
 
    // 0:73, 1:7, 2:7, 3:3, 4:4, 5:2, 7:1, 8:2, 9:1
@@ -493,7 +487,7 @@ test_mle_zinm
 
    test_assert_critical(mle_zinm(x2, 1, 100, par) != NULL);
    test_assert(fabs(par->alpha-1.8251) < 1e-3);
-   test_assert(fabs(par->p[0]-0.4109) < 1e-3);
+   test_assert(fabs(par->mu[0]-0.4109) < 1e-3);
    test_assert(fabs(par->pi-0.3363) < 1e-3);
 
    free(par);
@@ -501,6 +495,7 @@ test_mle_zinm
    return;
 
 }
+#endif
 
 
 int
@@ -524,7 +519,7 @@ main(
       {"ll_zinm", test_ll_zinm},
       {"nb_est_alpha", test_nb_est_alpha},
       {"mle_nm", test_mle_nm},
-      {"mle_zinm", test_mle_zinm},
+//      {"mle_zinm", test_mle_zinm},
       {NULL, NULL}
    };
 

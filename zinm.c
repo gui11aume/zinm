@@ -287,7 +287,7 @@ ll_zinm
 
 }
 
-
+#if 0
 zinm_par_t *
 mle_zinm
 (
@@ -396,6 +396,7 @@ mle_zinm
    return par;
 
 }
+#endif
 
 double
 nb_est_alpha
@@ -421,8 +422,8 @@ nb_est_alpha
       a_hi = a;
    }
 
-   // Input is pathological.
-   if (a_lo > 128) return -1.0;
+   // No convergence.
+   if (a_lo > 128) return INFINITY;
 
    double new_a = (a_lo + a_hi) / 2;
    for (int i = 0 ; i < ZINM_MAXITER ; i++) {
@@ -474,7 +475,7 @@ mle_nm
 //       if (!mle_nm(x, dim, nobs, par)) { /* something wrong /* }
 //
 //   Upon success, 'par->alpha' contains the alpha parameter and the
-//   other parameters are in 'par->p[0]', ... , 'par->p[dim+1]'.
+//   other parameters are in 'par->mu[0]', ... , 'par->mu[dim-1]'.
 //
 //   See the test cases for simple examples of usage.
 //
@@ -498,33 +499,8 @@ mle_nm
       goto clean_and_return;
    }
 
-   double alpha = nb_est_alpha(tab);
-
-   if (alpha < 0) {
-      fprintf(stderr, "domain error in function '%s(): %s:%d'\n",
-            __func__, __FILE__, __LINE__);
-      goto clean_and_return;
-   }
-
-   // Compute the means in all dimensions.
-   means = malloc(dim * sizeof(double));
-   if (means == NULL) {
-      fprintf(stderr, "memory error in function '%s()': %s:%d\n",
-            __func__, __FILE__, __LINE__);
-      goto clean_and_return;
-   }
-
-   compute_means(x, dim, nobs, means);
-
-   double sum = 0;
-   for (size_t i = 0 ; i < dim ; i++) sum += means[i];
-
-   // Write the estimates to 'par'.
-   par->alpha = alpha;
-   par->p[0] = alpha / (alpha + sum);
-   for (size_t i = 1 ; i < dim+1 ; i++) {
-      par->p[i] = par->p[0] / alpha * means[i-1];
-   }
+   par->alpha = nb_est_alpha(tab);
+   compute_means(x, dim, nobs, par->mu);
 
    // Success.
    status = 1;
@@ -630,16 +606,16 @@ compute_means
 zinm_par_t *
 new_zinm_par
 (
-   int r
+   int dim
 )
 {
 
-   zinm_par_t *new = calloc(1, sizeof(zinm_par_t) + (r+1)*sizeof(double));
+   zinm_par_t *new = calloc(1, sizeof(zinm_par_t) + dim*sizeof(double));
    if (new == NULL) {
       fprintf(stderr, "memory error: %s:%d\n", __FILE__, __LINE__);
       return NULL;
    }
-   new->r = r;
+   new->dim = dim;
    new->pi = 1.0;
 
    return new;

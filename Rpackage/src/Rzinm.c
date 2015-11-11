@@ -43,10 +43,10 @@ R_call_mle_nm
 
    // Success. Copy the (useful) values of 'par' to 'ret'.
    SEXP RET;
-   PROTECT(RET = allocVector(REALSXP, d+2));
+   PROTECT(RET = allocVector(REALSXP, d+1));
    REAL(RET)[0] = par->alpha;
-   for (size_t i = 0 ; i < d+1 ; i++) {
-      REAL(RET)[i+1] = par->p[i];
+   for (size_t i = 0 ; i < d ; i++) {
+      REAL(RET)[i+1] = par->mu[i];
    }
 
    UNPROTECT(1);
